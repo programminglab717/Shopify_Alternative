@@ -455,6 +455,9 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
         case 'ThemeExperimentDraftTakeOut':
           running = { ...running, drafts: [draft('th_2', 20, true), draft('th_3', 15)] };
           return { themeExperimentDraftTakeOut: { themeExperiment: running, userErrors: [] } };
+        case 'ThemeExperimentDraftLetBackIn':
+          running = { ...running, drafts: [draft('th_2', 20), draft('th_3', 15)] };
+          return { themeExperimentDraftLetBackIn: { themeExperiment: running, userErrors: [] } };
         default:
           return undefined;
       }
@@ -487,5 +490,13 @@ describe('Theme experiments (OS-22, ADR-866)', () => {
     // Taken out, it isn't asked its share, nor offered to take out again.
     expect(section.queryByLabelText('Shoppers shown Loud (%)')).toBeNull();
     expect(section.queryByRole('button', { name: 'Take Loud out' })).toBeNull();
+    // But it may be let back in (ADR-977).
+    fireEvent.click(section.getByRole('button', { name: 'Let Loud back in' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'ThemeExperimentDraftLetBackIn')?.variables,
+      ).toEqual({ id: 'texp_5', themeId: 'th_2' }),
+    );
+    expect(await section.findByRole('button', { name: 'Take Loud out' })).toBeTruthy();
   });
 });

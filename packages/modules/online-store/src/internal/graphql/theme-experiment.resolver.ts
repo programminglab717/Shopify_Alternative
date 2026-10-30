@@ -354,6 +354,25 @@ export class ThemeExperimentResolver {
   }
 
   @Mutation(() => ThemeExperimentPayload, {
+    description:
+      'Lets a draft the shop took out back into its running experiment (ADR-977), its counts ' +
+      'going on from where they stopped. A draft Hatti stopped as it sold clearly worse stays ' +
+      'stopped.',
+  })
+  @RequireScopes('write_themes')
+  async themeExperimentDraftLetBackIn(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('themeId', { type: () => ID }) themeId: string,
+  ): Promise<ThemeExperimentPayload> {
+    const uuid = tryFromPublicId(id, 'themeExperiment');
+    if (!uuid) return notFound('id');
+    const theme = tryFromPublicId(themeId, 'theme');
+    if (!theme) return notFound('themeId');
+    return payload(await this.experiments.letDraftBackIn(tenant, uuid, theme), tenant.currency);
+  }
+
+  @Mutation(() => ThemeExperimentPayload, {
     description: 'Ends a running experiment: every shopper sees the live theme again.',
   })
   @RequireScopes('write_themes')

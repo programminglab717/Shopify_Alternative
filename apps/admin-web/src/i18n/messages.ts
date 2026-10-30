@@ -4990,6 +4990,7 @@ const en = {
   'experiments.draftTakenOut':
     'You took {name} out. Its shoppers see your live theme; the other drafts go on.',
   'experiments.takeOut': 'Take {name} out',
+  'experiments.letBackIn': 'Let {name} back in',
   'experiments.addDraft': 'Add a draft',
   'experiments.addShare': 'Its share (%)',
   'experiments.add': 'Add draft',
@@ -12313,6 +12314,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'experiments.draftTakenOut':
     'آپ نے {name} نکال دی۔ اس کے خریدار آپ کی لائیو تھیم دیکھتے ہیں؛ باقی ڈرافٹس جاری ہیں۔',
   'experiments.takeOut': '{name} نکالیں',
+  'experiments.letBackIn': '{name} دوبارہ شامل کریں',
   'experiments.addDraft': 'ڈرافٹ شامل کریں',
   'experiments.addShare': 'اس کا حصہ (%)',
   'experiments.add': 'ڈرافٹ شامل کریں',

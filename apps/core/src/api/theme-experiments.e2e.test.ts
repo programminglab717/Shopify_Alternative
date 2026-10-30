@@ -307,6 +307,30 @@ describe.skipIf(!server)('Admin GraphQL API: theme experiments of several drafts
     expect((await data(OUT, { id, themeId: e })).userErrors).toEqual([
       { field: ['themeId'], message: 'The experiment shows no such draft' },
     ]);
+    // Let back in (ADR-977), its counts going on; one Hatti stopped stays stopped.
+    const BACK = `mutation ($id: ID!, $themeId: ID!) {
+      themeExperimentDraftLetBackIn(id: $id, themeId: $themeId) {
+        themeExperiment { drafts { themeId stopped takenOut } }
+        userErrors { field message }
+      }
+    }`;
+    expect((await data(BACK, { id, themeId: b })).userErrors).toEqual([
+      { field: ['themeId'], message: 'This draft is shown to shoppers already' },
+    ]);
+    expect((await data(BACK, { id, themeId: c })).themeExperiment.drafts[1]).toEqual({
+      themeId: c,
+      stopped: false,
+      takenOut: false,
+    });
+    await admin.query(
+      `UPDATE online_store.theme_experiments SET stopped_arms = '{c}' WHERE ended_at IS NULL`,
+    );
+    expect((await data(BACK, { id, themeId: c })).userErrors).toEqual([
+      {
+        field: ['themeId'],
+        message: 'Hatti stopped this draft as it sold clearly worse: it stays stopped',
+      },
+    ]);
     // The last of them taken out, it ends.
     expect((await data(OUT, { id, themeId: b })).themeExperiment.endedAt).toBeNull();
     const last = await data(OUT, { id, themeId: d });
@@ -319,6 +343,7 @@ describe.skipIf(!server)('Admin GraphQL API: theme experiments of several drafts
       'theme_experiment.draft_added',
       'theme_experiment.draft_added',
       'theme_experiment.draft_taken_out',
+      'theme_experiment.draft_let_back_in',
       'theme_experiment.draft_taken_out',
       'theme_experiment.draft_taken_out',
     ]);

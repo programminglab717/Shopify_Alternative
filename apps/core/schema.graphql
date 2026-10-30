@@ -12152,6 +12152,11 @@ type Mutation {
   themeExperimentDraftAdd(id: ID!, share: Int!, themeId: ID!): ThemeExperimentPayload!
 
   """
+  Lets a draft the shop took out back into its running experiment (ADR-977), its counts going on from where they stopped. A draft Hatti stopped as it sold clearly worse stays stopped.
+  """
+  themeExperimentDraftLetBackIn(id: ID!, themeId: ID!): ThemeExperimentPayload!
+
+  """
   Takes a draft out of a running experiment (ADR-970): its shoppers see the live theme from then, its counts kept as they were, the other drafts going on. With none left, it ends.
   """
   themeExperimentDraftTakeOut(id: ID!, themeId: ID!): ThemeExperimentPayload!

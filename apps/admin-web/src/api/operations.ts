@@ -13510,6 +13510,22 @@ export const ThemeExperimentDraftAddMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A draft the shop took out let back into its running experiment (ADR-977). */
+export const ThemeExperimentDraftLetBackInMutation = /* GraphQL */ `
+  mutation ThemeExperimentDraftLetBackIn($id: ID!, $themeId: ID!) {
+    themeExperimentDraftLetBackIn(id: $id, themeId: $themeId) {
+      themeExperiment {
+        ...ThemeExperimentFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME_EXPERIMENT}
+  ${USER_ERRORS}
+`;
+
 /** A draft taken out of a running experiment, the others going on (ADR-970). */
 export const ThemeExperimentDraftTakeOutMutation = /* GraphQL */ `
   mutation ThemeExperimentDraftTakeOut($id: ID!, $themeId: ID!) {

@@ -3,6 +3,7 @@ import { Fragment, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   ThemeExperimentDraftAddMutation,
+  ThemeExperimentDraftLetBackInMutation,
   ThemeExperimentDraftTakeOutMutation,
   ThemeExperimentEndMutation,
   ThemeExperimentSharesSetMutation,
@@ -315,6 +316,9 @@ function ChangeDrafts({
   const takeOut = useAdminMutation<ThemeExperimentPayloadData, { id: string; themeId: string }>(
     ThemeExperimentDraftTakeOutMutation,
   );
+  const letBackIn = useAdminMutation<ThemeExperimentPayloadData, { id: string; themeId: string }>(
+    ThemeExperimentDraftLetBackInMutation,
+  );
   const shown = experiment.drafts?.length
     ? experiment.drafts
     : [{ themeId: experiment.themeId, stopped: false, takenOut: false }];
@@ -328,8 +332,11 @@ function ChangeDrafts({
     setProblem(null);
     try {
       const done = await work();
-      const error = (done.themeExperimentDraftAdd ?? done.themeExperimentDraftTakeOut)
-        ?.userErrors[0];
+      const error = (
+        done.themeExperimentDraftAdd ??
+        done.themeExperimentDraftTakeOut ??
+        done.themeExperimentDraftLetBackIn
+      )?.userErrors[0];
       if (error) setProblem(problemText(error, t));
       else setThemeId('');
     } catch (failure) {
@@ -341,7 +348,19 @@ function ChangeDrafts({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         {shown.map((draft) =>
-          draft.stopped || draft.takenOut ? null : (
+          draft.takenOut ? (
+            // Taken out by the shop, let back in (ADR-977); Hatti's stops stay.
+            <Button
+              key={draft.themeId}
+              variant="secondary"
+              busy={letBackIn.isPending}
+              onClick={() =>
+                void run(() => letBackIn.mutateAsync({ id: experiment.id, themeId: draft.themeId }))
+              }
+            >
+              {t('experiments.letBackIn', { name: themeName(draft.themeId) })}
+            </Button>
+          ) : draft.stopped ? null : (
             <Button
               key={draft.themeId}
               variant="secondary"

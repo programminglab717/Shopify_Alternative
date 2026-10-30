@@ -6696,6 +6696,10 @@ export interface ThemeExperimentPayloadData {
     themeExperiment: ThemeExperiment | null;
     userErrors: UserError[];
   };
+  themeExperimentDraftLetBackIn?: {
+    themeExperiment: ThemeExperiment | null;
+    userErrors: UserError[];
+  };
 }
 
 /** A function an app gives the shop's checkout (DEV-07, ADR-868). */

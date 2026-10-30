@@ -692,6 +692,56 @@ export class ThemeExperimentService {
     });
   }
 
+  /**
+   * Lets a draft the shop took out back into its running experiment (ADR-977): its arm goes on,
+   * its counts from where they stopped, its share of the shoppers still to come as before; those
+   * of its shoppers shown the live theme meanwhile see the draft again. A draft Hatti stopped as
+   * it sold clearly worse (ADR-939) stays stopped.
+   */
+  async letDraftBackIn(
+    tenant: TenantContext,
+    id: string,
+    themeId: string,
+  ): Promise<MutationResult<ThemeExperimentRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const before = await this.lockRunning(tx, tenant.shopId, id);
+      if (!before) return failOne(['id'], 'NOT_FOUND', NOT_FOUND);
+      const at = before.themeIds.indexOf(themeId);
+      if (at < 0) return failOne(['themeId'], 'NOT_FOUND', 'The experiment shows no such draft');
+      const arm = EXPERIMENT_ARMS[at + 1] as DraftArmName;
+      if (!before.takenOutArms.includes(arm)) {
+        return failOne(
+          ['themeId'],
+          'INVALID',
+          before.stoppedArms.includes(arm)
+            ? 'Hatti stopped this draft as it sold clearly worse: it stays stopped'
+            : 'This draft is shown to shoppers already',
+        );
+      }
+      const { rows } = await tx.execute<ExperimentRow>(sql`
+        UPDATE online_store.theme_experiments
+           SET taken_out_arms = array_remove(taken_out_arms, ${arm}::text),
+               stopped_arms = array_remove(stopped_arms, ${arm}::text)
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}
+        RETURNING ${COLUMNS}`);
+      const record = toRecord(rows[0]!);
+      await appendEvent(tx, tenant.shopId, {
+        type: OnlineStoreEvents.ThemeExperimentUpdated,
+        aggregateType: 'theme_experiment',
+        aggregateId: record.id,
+        payload: {},
+      });
+      await recordAudit(tx, tenant.shopId, {
+        action: 'theme_experiment.draft_let_back_in',
+        subjectType: 'theme',
+        subjectId: themeId,
+        ...actorColumnsOf(tenant.actor),
+        details: { name: record.name },
+      });
+      return { ok: true, value: record };
+    });
+  }
+
   /** The shop's running experiment `id`, locked for the caller's change; null for none. */
   private async lockRunning(
     tx: Tx,
