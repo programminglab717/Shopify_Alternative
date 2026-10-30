@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-981 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-985 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -989,6 +989,10 @@
 | 979 | The sales report shows the owner's stores abroad beside this shop, in the report's own period | Accepted |
 | 980 | A collection's buy button may lead with one of its products, across, above the rest | Accepted |
 | 981 | An expansion store's margin by a metafield's value, after a product's tags' | Accepted |
+| 982 | The headless starter joins the browser's recently viewed to the shopper's account once, then keeps none of its own | Accepted |
+| 983 | An expansion store's margin by a list metafield matches any one of its lines | Accepted |
+| 984 | A collection's buy button may lead with up to three of its products, in the order chosen | Accepted |
+| 985 | A custom report may be of this shop and the owner's stores abroad, run and scheduled by the owner alone | Accepted |
 
 ---
 
@@ -31678,7 +31682,7 @@
     "Recently viewed" reads it, on any device; a guest's stays in the browser as before.
 * **Consequences:**
   * A shopper finds again what they looked at on another device, once signed in.
-  * Not yet: the browser's list joined to the account on signing in.
+  * Not yet: the browser's list joined to the account on signing in (built, ADR-982).
 
 
 ## ADR-979 · The sales report shows the owner's stores abroad beside this shop, in the report's own period
@@ -31693,7 +31697,8 @@
   none of the other shops' figures, does not see it.
 * **Consequences:**
   * The owner sees their shops abroad beside this one without leaving the report.
-  * Not yet: the chart in a custom report, or in its emailed schedule.
+  * Not yet: the chart in a custom report, or in its emailed schedule (its figures, built,
+    ADR-985).
 
 
 ## ADR-980 · A collection's buy button may lead with one of its products, across, above the rest
@@ -31712,7 +31717,8 @@
     and the snippet shows it.
 * **Consequences:**
   * A shop leads its embedded collection with the product it wants seen.
-  * Not yet: more than one product featured, or another layout for the one featured.
+  * Not yet: more than one product featured (built, ADR-984), or another layout for the one
+    featured.
 
 
 ## ADR-981 · An expansion store's margin by a metafield's value, after a product's tags'
@@ -31731,4 +31737,73 @@
   * A shop prices goods abroad by the facts it already keeps in metafields.
   * A change to a metafield alone does not mark the product changed, so it is copied at the
     store's next copy rather than at once.
-  * Not yet: matching one item of a list metafield.
+  * Not yet: matching one item of a list metafield (built, ADR-983).
+
+## ADR-982 · The headless starter joins the browser's recently viewed to the shopper's account once, then keeps none of its own
+
+* **Context:** ADR-978 keeps a signed-in shopper's recently viewed with their account. The
+  starter sent the browser's whole list with every product viewed, so each view moved that
+  device's older views ahead of newer ones from the shopper's other devices. ADR-978 left the
+  browser's list joined to the account on signing in as not yet.
+* **Decision:** the starter's `recentProducts` says whether the list is kept with the account.
+  The first time it is, the browser's list joins the account's, and the browser then keeps none
+  of its own. After that each view sends only the product viewed, so the account's list is in
+  the order the shopper viewed things, whichever device they used.
+* **Consequences:**
+  * Recently viewed is one list across devices, in true order.
+  * A shopper who signs out starts a fresh list in that browser; their account keeps the old
+    one.
+
+
+## ADR-983 · An expansion store's margin by a list metafield matches any one of its lines
+
+* **Context:** ADR-981 matches a margin by metafield against the metafield's whole value, so a
+  list of lines, as `["Eid", "Mehndi"]`, matched only by that whole list. ADR-981 left matching
+  one item of a list metafield as not yet.
+* **Decision:** a `list.single_line_text_field` metafield matches a margin by any one of its
+  lines, letter case and spaces at the ends aside; any other metafield, by its whole value, as
+  before. A product's matching values are read once, as a set, in the same query as its type,
+  vendor and tags.
+* **Consequences:**
+  * A shop prices by an occasion, a fabric or a season kept as a list, without a tag for each.
+
+
+## ADR-984 · A collection's buy button may lead with up to three of its products, in the order chosen
+
+* **Context:** ADR-980 lets a collection's buy button lead with one product. Shops with a
+  launch or a few best sellers want more than one shown large. ADR-980 left more than one
+  featured as not yet.
+* **Decision:**
+  * **The snippet's `data-featured`** names up to three handles, separated by commas, each cut
+    to a handle's letters, the same one once.
+  * **The script** shows each across, in the snippet's order, whichever answers first, above
+    the others, which then leave them all out. A product no longer shown leaves no gap.
+  * **Admin:** after the first "Featured product", the card offers another, of those not yet
+    chosen, until three or until none is left.
+* **Consequences:**
+  * A shop leads its embedded collection with a few products it wants seen.
+  * Not yet: another layout for the ones featured.
+
+
+## ADR-985 · A custom report may be of this shop and the owner's stores abroad, run and scheduled by the owner alone
+
+* **Context:** ADR-979 shows the stores' chart in the sales report. An owner who wants it each
+  week by email had no way: the stores' sales are read across shops, and custom reports (ADR-817)
+  and their schedules (ADR-818) are each shop's alone. ADR-979 left the chart in a custom report,
+  or in its emailed schedule, as not yet.
+* **Decision:**
+  * **A `stores` breakdown** (migration 0433): this shop, then each expansion store the owner
+    still owns, each row's orders and total sales in this shop's currency, each day at its rate
+    (ADR-974), and its total all of them. Only amounts in this shop's currency are offered, as
+    the stores sell in their own.
+  * **Read through the core:** the orders module asks a `StoreSalesSource` for them, which the
+    core provides. It is the same class that reads the stores' page, moved out of its resolver,
+    so the page and the report agree. It refuses anyone but the shop's owner: in the admin, the
+    API, the AI question box and a schedule alike, a schedule being run as the member of staff
+    it goes to.
+  * **Admin:** "This shop and each store abroad" is offered to the owner alone, starting from
+    orders and total sales in this shop's currency.
+* **Consequences:**
+  * The owner gets the stores' sales in a workbook by email, daily, weekly or monthly.
+  * Others of the shop's staff see the report in the list but cannot run it.
+  * Not yet: a chart in custom reports.
