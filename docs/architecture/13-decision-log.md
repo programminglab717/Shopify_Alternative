@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-968 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-969 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -976,6 +976,7 @@
 | 966 | The admin's and the console's tests check each screen's accessibility with axe | Accepted |
 | 967 | Shoppers' pages in every platform theme, and checkout, are checked with axe | Accepted |
 | 968 | hatti theme check reads a theme's pages through its preview with axe | Accepted |
+| 969 | A shop keeps a wholesale customer it knows well out of payment terms reminders | Accepted |
 
 ---
 
@@ -31395,7 +31396,8 @@
     "Payment terms reminders" asks for the days before the date as well.
 * **Consequences:**
   * Each shop's customers hear of their dates as its trade expects.
-  * Not yet: reminders by the customer, some on terms told more often than others.
+  * Not yet: reminders by the customer, some on terms told more often than others (kept from a
+    customer: ADR-969).
 
 ## ADR-966 · The admin's and the console's tests check each screen's accessibility with axe
 
@@ -31473,3 +31475,26 @@
   * Not yet: the check run by Hatti itself when a theme is offered, which needs the preview
     rendered where the core runs; pages of the theme's own templates beyond those five kinds;
     and contrast with the theme's colours.
+
+## ADR-969 · A shop keeps a wholesale customer it knows well out of payment terms reminders
+
+* **Context:** ADR-945, ADR-954, ADR-964 and ADR-965 remind every customer of their orders on
+  payment terms, as the shop's order policies say. A wholesaler of long standing, who pays on
+  the day without being asked, is reminded as a new one is, and a shop said it would rather they
+  were not; ADR-965 left reminders by customer as not yet.
+* **Decision:**
+  * **`orders.terms_reminders_off`** (migration 0428) holds the customers a shop keeps out: a row
+    means none of their orders on terms is reminded, before the date or past it. No row, the
+    default, is reminded as the shop's policies say.
+  * **`customerTermsRemindersSet(customerId, reminded)`** (`write_orders`) sets it, and
+    `CustomerCredit.reminded` says it, beside the credit limit (ADR-907). The sweep leaves their
+    orders as they are, so a customer let back in is reminded at the next sweep as their orders
+    then stand; reminders already sent stay sent.
+  * **The customer's page**, in its credit section, has "Remind them of payments owed", saved as
+    it is ticked, for owners and managers; an accountant sees "Not reminded of payments owed."
+  * A customer merged into another keeps them out if either was; an erased customer's row goes
+    with their credit limit.
+* **Consequences:**
+  * A shop keeps reminders for those who need them.
+  * Not yet: reminders by customer at other intervals, and a customer's own choice from their
+    order page.
