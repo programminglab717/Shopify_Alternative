@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-972 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-973 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -980,6 +980,7 @@
 | 970 | A running theme experiment takes a draft more as its next arm, or has one taken out | Accepted |
 | 971 | An expansion store's margin by product type or vendor | Accepted |
 | 972 | The Storefront API's nodes gives variants by their IDs too, through an index of each variant's product | Accepted |
+| 973 | The Storefront API's node gives one thing by its ID, as nodes does | Accepted |
 
 ---
 
@@ -31573,4 +31574,16 @@
 * **Consequences:**
   * A headless shop finds a saved line's variant by its ID, as on Shopify.
   * Every shop is published once again after the deploy, as for any change of the documents.
-  * Not yet: `node(id:)` for one ID, and variants of products the storefront doesn't show.
+  * Not yet: `node(id:)` for one ID (built, ADR-973), and variants of products the storefront
+    doesn't show.
+
+## ADR-973 · The Storefront API's node gives one thing by its ID, as nodes does
+
+* **Context:** Shopify's Storefront API has `node(id:)` beside `nodes(ids:)`, and clients built
+  for it ask for one thing that way. ADR-972 left it as not yet.
+* **Decision:** `node(id: ID!): Node` gives what `nodes` would for that one ID: a product,
+  variant, collection, page, blog or article, or null for one the shop doesn't show. Both read
+  through one function, so the two never differ.
+* **Consequences:**
+  * A client written for Shopify's `node` works unchanged.
+  * Not yet: variants of products the storefront doesn't show.
