@@ -359,12 +359,14 @@ const PERIODS = [7, 30, 90] as const;
 /**
  * What this shop and each of its expansion stores sold lately, on one page (ADR-932): each in its
  * own currency and in this shop's at the day's rate, and all of them together; and day by day, or
- * week by week over 90 days, each store's part of each bar in rupees (ADR-955).
+ * week by week over 90 days, each store's part of each bar in rupees (ADR-955). In the sales
+ * report (ADR-979), the report's own period is given, and no other is offered.
  */
-function StoreSales() {
+export function StoreSales({ period: given }: { period?: (typeof PERIODS)[number] } = {}) {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
-  const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
+  const [chosen, setDays] = useState<(typeof PERIODS)[number]>(30);
+  const days = given ?? chosen;
   // Whole days in the shop's time, today's included, as the page was opened: the same period
   // however often it is drawn, its days the chart's.
   const [now] = useState(() => new Date());
@@ -406,15 +408,17 @@ function StoreSales() {
         {t('expansion.sales')}
       </h2>
       <Card className="flex flex-col gap-3 p-4">
-        <SelectField
-          label={t('expansion.salesPeriod')}
-          value={String(days)}
-          options={PERIODS.map((each) => ({
-            value: String(each),
-            label: t('expansion.days', { count: each }),
-          }))}
-          onChange={(value) => setDays(Number(value) as (typeof PERIODS)[number])}
-        />
+        {given === undefined && (
+          <SelectField
+            label={t('expansion.salesPeriod')}
+            value={String(days)}
+            options={PERIODS.map((each) => ({
+              value: String(each),
+              label: t('expansion.days', { count: each }),
+            }))}
+            onChange={(value) => setDays(Number(value) as (typeof PERIODS)[number])}
+          />
+        )}
         {query.isPending ? (
           <Loading label={t('state.loading')} />
         ) : query.isError ? (

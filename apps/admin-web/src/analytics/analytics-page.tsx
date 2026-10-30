@@ -2,8 +2,14 @@ import { AskNumbers } from './ask';
 import { Link } from '@tanstack/react-router';
 import { Download, Gauge, Table2 } from 'lucide-react';
 import { useState } from 'react';
-import { SalesQuery, SalesReportExportMutation } from '../api/operations';
-import type { MoneyValue, SalesData, SalesReportExportData, SalesTotalsValue } from '../api/types';
+import { ExpansionStoresQuery, SalesQuery, SalesReportExportMutation } from '../api/operations';
+import type {
+  ExpansionStoresData,
+  MoneyValue,
+  SalesData,
+  SalesReportExportData,
+  SalesTotalsValue,
+} from '../api/types';
 import { gate, permits } from '../auth/permissions';
 import { SEES_AGENTS } from '../desk/agents-page';
 import { errorText } from '../i18n/errors';
@@ -12,6 +18,7 @@ import { useLocale } from '../i18n/locale';
 import { FormSection } from '../products/product-form';
 import { EXPORTS_ORDERS, save } from '../orders/export-page';
 import { problemText } from '../products/product-form';
+import { StoreSales } from '../settings/expansion-stores-page';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
@@ -30,6 +37,16 @@ import { LiveView, Visits } from './visits';
 export const READS_ANALYTICS = gate(['owner', 'manager', 'marketer', 'accountant'], 'read_orders');
 
 const amount = (money: MoneyValue | null) => Number(money?.amount ?? 0);
+
+/**
+ * The owner's stores abroad beside this shop, in the report's period (ADR-979), as the expansion
+ * stores' page draws them (ADR-955): shown to the owner alone, once they have a store.
+ */
+function StoresSales({ days }: { days: Days }) {
+  const query = useAdminQuery<ExpansionStoresData>(['expansionStores'], ExpansionStoresQuery);
+  if ((query.data?.expansionStores ?? []).length === 0) return null;
+  return <StoreSales period={days} />;
+}
 
 function Totals({
   now,
@@ -229,6 +246,7 @@ export function AnalyticsPage() {
               }),
             }))}
           />
+          {shop.role === 'owner' && <StoresSales days={days} />}
           <div className="grid gap-4 md:grid-cols-2">
             <FormSection title={t('analytics.topProducts')}>
               {query.data.salesReport.topProducts.length === 0 ? (

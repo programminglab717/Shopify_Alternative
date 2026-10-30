@@ -133,6 +133,63 @@ describe('Analytics in the admin', () => {
     expect(screen.queryByText('Return on ad spend')).toBeNull();
   });
 
+  it("shows the owner's stores abroad in the report's own period, once they have one (ADR-979)", async () => {
+    const asked: Record<string, unknown>[] = [];
+    const core = fakeCore('owner', (operation, variables) => {
+      if (operation in NO_VISITS) return NO_VISITS[operation];
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
+      if (operation === 'ExpansionStores') return { expansionStores: [{ shopId: 'shop_2' }] };
+      if (operation === 'ExpansionStoreSales') {
+        asked.push(variables);
+        return {
+          expansionStoreSales: [
+            {
+              shopId: 'shop_1',
+              name: 'Zari',
+              here: true,
+              currencyCode: 'PKR',
+              orders: 3,
+              netSales: rupees('9000'),
+              totalSales: rupees('9000'),
+              totalSalesHere: rupees('9000'),
+              periods: [],
+            },
+            {
+              shopId: 'shop_2',
+              name: 'Zari Abroad',
+              here: false,
+              currencyCode: 'USD',
+              orders: 1,
+              netSales: { amount: '40.00', currencyCode: 'USD' },
+              totalSales: { amount: '40.00', currencyCode: 'USD' },
+              totalSalesHere: rupees('11200'),
+              periods: [],
+            },
+          ],
+        };
+      }
+      if (operation !== 'Sales') return {};
+      return {
+        salesReport: {
+          totals: totals('9000', 3),
+          previous: { totals: totals('6000', 2) },
+          periods: [],
+          topProducts: [],
+          rows: [],
+          trueProfit: true,
+        },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/analytics');
+    const heading = await screen.findByRole('heading', { name: 'Sales across your stores' });
+    const section = within(heading.closest('section')!);
+    expect((await section.findAllByText('Zari Abroad')).length).toBeGreaterThan(0);
+    // The report's period, 30 days, and no other offered.
+    expect(section.queryByLabelText('Period')).toBeNull();
+    expect(asked.at(-1)).toMatchObject({ interval: 'DAY' });
+  });
+
   it("downloads the period's sales as Excel for the accountant, or says why not (ADR-798)", async () => {
     let refuse = true;
     const core = fakeCore('accountant', (operation) => {
