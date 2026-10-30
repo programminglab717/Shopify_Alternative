@@ -134,6 +134,12 @@ export class RedisStore implements StoreData {
     return this.#redis.hkeys(this.keys.handles(this.shopId, 'product'));
   }
 
+  async productIdsOfVariants(variantIds: readonly string[]): Promise<(string | null)[]> {
+    if (variantIds.length === 0) return [];
+    this.roundTrips += 1;
+    return this.#redis.hmget(this.keys.variantProducts(this.shopId), ...variantIds);
+  }
+
   async sitemap(kind: HandledKind): Promise<SitemapEntry[]> {
     this.roundTrips += 1;
     const answers = await this.#redis

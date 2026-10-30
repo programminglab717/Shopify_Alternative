@@ -9,7 +9,7 @@ import type { DraftArm, HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 16;
+export const DOCUMENTS_VERSION = 17;
 
 /**
  * What search engines and link previews are told of a product, collection, page, blog or article
@@ -1006,6 +1006,12 @@ export interface StoreData {
   sitemap(kind: HandledKind): Promise<SitemapEntry[]>;
   /** The ID of every product the storefront shows, for its catalog feed: in no order, likewise. */
   productIds(): Promise<string[]>;
+  /**
+   * The product of each variant `variantIds` names (ADR-972), in the order asked, in one round
+   * trip: null for one the storefront doesn't know. A variant its product no longer has may still
+   * name it, so the product's own variants have the last word.
+   */
+  productIdsOfVariants(variantIds: readonly string[]): Promise<(string | null)[]>;
 }
 
 /** A shop's documents, as the catalog would write them. */
@@ -1148,6 +1154,15 @@ export class MemoryStore implements StoreData {
 
   productIds(): Promise<string[]> {
     return this.#answer([...this.#products.keys()]);
+  }
+
+  productIdsOfVariants(variantIds: readonly string[]): Promise<(string | null)[]> {
+    const of = new Map(
+      [...this.#products.values()].flatMap((product) =>
+        product.variants.map((variant) => [variant.id, product.id] as const),
+      ),
+    );
+    return this.#answer(variantIds.map((id) => of.get(id) ?? null));
   }
 
   sitemap(kind: HandledKind): Promise<SitemapEntry[]> {

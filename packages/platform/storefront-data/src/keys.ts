@@ -31,6 +31,15 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:${kind}-handles`;
   }
 
+  /**
+   * A hash of each variant's product, by the variant's ID (ADR-972), for the Storefront API's
+   * `nodes` to find a variant by its ID alone. A variant a product no longer has may linger,
+   * pointing to a product without it.
+   */
+  variantProducts(shopId: string): string {
+    return `${this.#base(shopId)}:variant-products`;
+  }
+
   /** A hash of what the sitemaps say of each document, by ID (ADR-236). */
   sitemap(shopId: string, kind: HandledKind): string {
     return `${this.#base(shopId)}:${kind}-sitemap`;

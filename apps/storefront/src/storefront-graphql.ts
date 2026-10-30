@@ -172,8 +172,9 @@ const SDL = /* GraphQL */ `
     """
     products(first: Int, after: String, query: String): ProductConnection!
     """
-    The products, collections, pages, blogs and articles with these IDs (ADR-956, ADR-959), in
-    their order, null for one the shop doesn't show: up to 250 at once, as Shopify's.
+    The products, variants, collections, pages, blogs and articles with these IDs (ADR-956,
+    ADR-959, ADR-972), in their order, null for one the shop doesn't show: up to 250 at once, as
+    Shopify's.
     """
     nodes(ids: [ID!]!): [Node]!
     collection(id: ID, handle: String): Collection
@@ -458,8 +459,8 @@ const SDL = /* GraphQL */ `
   }
 
   """
-  What nodes gives by its ID (ADR-956): a product, a collection, or a page, blog or article
-  (ADR-959).
+  What nodes gives by its ID (ADR-956): a product, a variant (ADR-972), a collection, or a page,
+  blog or article (ADR-959).
   """
   interface Node {
     id: ID!
@@ -513,7 +514,7 @@ const SDL = /* GraphQL */ `
     key: String!
   }
 
-  type ProductVariant {
+  type ProductVariant implements Node {
     id: ID!
     title: String!
     sku: String
@@ -1044,6 +1045,7 @@ export interface StorefrontApiShop {
     | 'products'
     | 'productByHandle'
     | 'productIds'
+    | 'productIdsOfVariants'
     | 'collectionByHandle'
     | 'handles'
     | 'menu'
@@ -2049,8 +2051,20 @@ function rootOf(api: StorefrontApiShop) {
       if (args.ids.length > STOREFRONT_API_LIMITS.first) {
         throw new GraphQLError(`Ask for ${STOREFRONT_API_LIMITS.first} IDs at most`);
       }
-      // The products at once; the collections, as the storefront has them, by handle.
-      const productIds = args.ids.flatMap((id) => idOf('Product', id) ?? []);
+      // The products at once, with those of the variants asked for, found by the storefront's
+      // index of them (ADR-972); the collections, as the storefront has them, by handle.
+      const variantIds = args.ids.flatMap((id) => idOf('ProductVariant', id) ?? []);
+      const variantProducts = new Map(
+        (variantIds.length > 0 ? await api.store.productIdsOfVariants(variantIds) : []).flatMap(
+          (productId, at) => (productId ? [[variantIds[at]!, productId] as const] : []),
+        ),
+      );
+      const productIds = [
+        ...new Set([
+          ...args.ids.flatMap((id) => idOf('Product', id) ?? []),
+          ...variantProducts.values(),
+        ]),
+      ];
       const products = new Map(
         (productIds.length > 0 ? await api.store.products(productIds) : []).flatMap((doc) =>
           doc ? [[doc.id, doc] as const] : [],
@@ -2088,6 +2102,11 @@ function rootOf(api: StorefrontApiShop) {
       return args.ids.map((id) => {
         const product = products.get(idOf('Product', id) ?? '');
         if (product) return { __typename: 'Product', ...productOf(product, api) };
+        // A variant its product still has: one it no longer has may linger in the index.
+        const variantId = idOf('ProductVariant', id) ?? '';
+        const itsProduct = products.get(variantProducts.get(variantId) ?? '');
+        const variant = itsProduct?.variants.find((each) => each.id === variantId);
+        if (itsProduct && variant) return variantOf(itsProduct, variant, api);
         const collection = collections.get(idOf('Collection', id) ?? '');
         if (collection) return { __typename: 'Collection', ...collectionOf(collection, api) };
         const page = pages.get(idOf('Page', id) ?? '');

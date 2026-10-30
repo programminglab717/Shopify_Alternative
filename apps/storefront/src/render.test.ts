@@ -3148,6 +3148,7 @@ describe('Storefront rendering', () => {
       handles: (kind) => memory.handles(kind),
       sitemap: (kind) => memory.sitemap(kind),
       productIds: () => memory.productIds(),
+      productIdsOfVariants: (ids) => memory.productIdsOfVariants(ids),
     };
     const page = await renderer.stream({ path: '/' }, store);
     expect(page.status).toBe(200);

@@ -41,13 +41,32 @@ export class ShopWriter {
     private readonly lockMs: number,
   ) {}
 
-  putProducts(docs: readonly ProductDoc[]): Promise<void> {
-    return this.#put('product', docs);
+  /** Products, and each variant's product (ADR-972), for `nodes` to find a variant by its ID. */
+  async putProducts(docs: readonly ProductDoc[]): Promise<void> {
+    await this.#put('product', docs);
+    const pairs = docs.flatMap((doc) => doc.variants.flatMap((variant) => [variant.id, doc.id]));
+    await this.#changeVariants([], pairs);
   }
 
-  /** Takes products off the storefront: deleted, or no longer active. */
-  dropProducts(ids: readonly string[]): Promise<void> {
-    return this.#drop('product', ids);
+  /**
+   * Takes products off the storefront: deleted, or no longer active; their variants' entries
+   * first, as their documents name them (ADR-972).
+   */
+  async dropProducts(ids: readonly string[]): Promise<void> {
+    for (let start = 0; start < ids.length; start += CHUNK) {
+      const chunk = ids.slice(start, start + CHUNK);
+      const docs = await this.redis.mget(chunk.map((id) => this.#doc('product', id)));
+      const variants = docs.flatMap((json) => {
+        if (!json) return [];
+        try {
+          return (JSON.parse(json) as ProductDoc).variants.map((variant) => variant.id);
+        } catch {
+          return [];
+        }
+      });
+      await this.#changeVariants(variants, []);
+    }
+    await this.#drop('product', ids);
   }
 
   putCollections(docs: readonly CollectionDoc[]): Promise<void> {
@@ -167,6 +186,21 @@ export class ShopWriter {
         JSON.stringify(sitemapEntryOf(kind, doc)),
       ]);
       this.#check(await this.redis.sfPut(keys.length, ...keys, this.token, this.lockMs, ...args));
+    }
+  }
+
+  /** Variants' entries gone, then others set, a chunk at a time (ADR-972). */
+  async #changeVariants(gone: readonly string[], pairs: readonly string[]): Promise<void> {
+    const [lock, hash] = [this.keys.lock(this.shopId), this.keys.variantProducts(this.shopId)];
+    for (let start = 0; start < gone.length; start += REDIRECT_CHUNK) {
+      const ids = gone.slice(start, start + REDIRECT_CHUNK);
+      this.#check(
+        await this.redis.sfChangeHash(lock, hash, this.token, this.lockMs, ids.length, ...ids),
+      );
+    }
+    for (let start = 0; start < pairs.length; start += REDIRECT_CHUNK * 2) {
+      const chunk = pairs.slice(start, start + REDIRECT_CHUNK * 2);
+      this.#check(await this.redis.sfChangeHash(lock, hash, this.token, this.lockMs, 0, ...chunk));
     }
   }
 

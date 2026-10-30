@@ -142,6 +142,27 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await store(shopId).collectionByHandle('eid-2026')).toBeNull();
   });
 
+  it("keeps each variant's product, for a variant found by its ID alone (ADR-972)", async () => {
+    const shopId = randomUUID();
+    const two = { ...product('p1', 'lawn'), variants: [product('p1', 'x').variants[0]!] };
+    two.variants.push({ ...two.variants[0]!, id: 'p1-v2', title: 'Large' });
+    await write(shopId, (writer) => writer.putProducts([two, product('p2', 'khussa')]));
+    expect(await store(shopId).productIdsOfVariants(['p1-v2', 'p2-v', 'p1-v', 'nope'])).toEqual([
+      'p1',
+      'p2',
+      'p1',
+      null,
+    ]);
+    // Taken off, its variants go with it; the other's stay.
+    await write(shopId, (writer) => writer.dropProducts(['p1', 'never-built']));
+    expect(await store(shopId).productIdsOfVariants(['p1-v2', 'p1-v', 'p2-v'])).toEqual([
+      null,
+      null,
+      'p2',
+    ]);
+    expect(await store(shopId).productIdsOfVariants([])).toEqual([]);
+  });
+
   it('keeps what the sitemaps say of each document beside its handle (ADR-236)', async () => {
     const shopId = randomUUID();
     const image = { src: '/images/s/p1/1.jpg', width: 800, height: 1000, alt: null };
@@ -507,8 +528,9 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
       await writer.putProducts([product('p1', 'lawn-suit')]);
     });
     await queue.add(shopId, ['product:p1']);
-    // The shop, the product, its handles both ways and its sitemap entry, and the queue.
-    expect(await queue.clear(shopId)).toBe(6);
+    // The shop, the product, its handles both ways, its sitemap entry and its variant's product
+    // (ADR-972), and the queue.
+    expect(await queue.clear(shopId)).toBe(7);
     await expect(store(shopId).shop()).rejects.toThrow(StoreMissingError);
     expect(await store(shopId).productByHandle('lawn-suit')).toBeNull();
     expect(await queue.size(shopId)).toBe(0);

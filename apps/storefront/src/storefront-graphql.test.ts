@@ -267,6 +267,38 @@ describe('The Storefront API (DEV-02, ADR-848)', () => {
     expect(many.errors?.[0]?.message).toBe('Ask for 250 IDs at most');
   });
 
+  it('gives variants by their IDs too, with their product, as a cart line would ask (ADR-972)', async () => {
+    const [first, second] = lawn.variants;
+    const ids = [
+      `gid://hatti/ProductVariant/${second!.id}`,
+      'gid://hatti/ProductVariant/gone',
+      `gid://hatti/Product/${lawn.id}`,
+      `gid://hatti/ProductVariant/${first!.id}`,
+    ];
+    const { data, errors } = await ask(
+      `query ($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          __typename id
+          ... on ProductVariant { title price { amount } product { handle } }
+        }
+      }`,
+      { ids },
+    );
+    expect(errors).toBeUndefined();
+    expect(data.nodes).toEqual([
+      {
+        __typename: 'ProductVariant',
+        id: ids[0],
+        title: second!.title,
+        price: { amount: expect.any(String) },
+        product: { handle: lawn.handle },
+      },
+      null,
+      { __typename: 'Product', id: ids[2] },
+      expect.objectContaining({ __typename: 'ProductVariant', title: first!.title }),
+    ]);
+  });
+
   it('searches through the core where a query is given', async () => {
     const { data } = await ask(`{ products(first: 5, query: "lawn") { nodes { id } } }`);
     expect(data.products.nodes).toEqual([{ id: `gid://hatti/Product/${lawn.id}` }]);

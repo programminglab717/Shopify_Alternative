@@ -192,6 +192,10 @@ export class TranslatedStore implements StoreData {
     return this.store.productIds();
   }
 
+  productIdsOfVariants(variantIds: readonly string[]): Promise<(string | null)[]> {
+    return this.store.productIdsOfVariants(variantIds);
+  }
+
   #one<T extends Translatable>(doc: T | null): T | null {
     return doc && translated(doc, this.locale);
   }
