@@ -24,3 +24,25 @@ export async function purgePublishedEvents(db: Db, before: Date, limit: number):
      )`);
   return result.rowCount ?? 0;
 }
+
+/** Days ahead the outbox's daily partitions are made (ADR-988), so a day never waits for one. */
+export const OUTBOX_PARTITION_DAYS_AHEAD = 7;
+
+/**
+ * Keeps the outbox's daily partitions (ADR-988): those of the UTC days from `at`'s to a week on
+ * made, each taking what the default partition holds of its day, and those of days ended by
+ * `before` dropped, unless one of their events is unpublished or published since. Says how many
+ * it made and dropped.
+ */
+export async function maintainOutboxPartitions(
+  db: Db,
+  at: Date,
+  before: Date,
+): Promise<{ made: number; dropped: number }> {
+  const { rows } = await db.execute<{ made: number; dropped: number }>(sql`
+    SELECT platform.outbox_make_partitions(
+             (${at.toISOString()}::timestamptz AT TIME ZONE 'UTC')::date,
+             ${OUTBOX_PARTITION_DAYS_AHEAD + 1}) AS made,
+           platform.outbox_drop_partitions(${before.toISOString()}::timestamptz) AS dropped`);
+  return { made: Number(rows[0]?.made ?? 0), dropped: Number(rows[0]?.dropped ?? 0) };
+}

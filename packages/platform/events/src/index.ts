@@ -27,4 +27,9 @@ export {
   type QueueLocation,
 } from './queue.js';
 export { OutboxRelay, type EventPublisher, type OutboxRelayOptions } from './relay.js';
-export { OUTBOX_KEPT_DAYS, purgePublishedEvents } from './retention.js';
+export {
+  OUTBOX_KEPT_DAYS,
+  OUTBOX_PARTITION_DAYS_AHEAD,
+  maintainOutboxPartitions,
+  purgePublishedEvents,
+} from './retention.js';
