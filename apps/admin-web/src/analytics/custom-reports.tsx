@@ -314,6 +314,110 @@ export function ReportsPage() {
   );
 }
 
+/** The rows a chart of a report not over time shows at most: the first, in its order. */
+const CHART_ROWS = 10;
+
+/** Rows that are periods, charted over time; the others ranked across. */
+const OVER_TIME: readonly CustomReportBreakdown[] = ['DAY', 'WEEK', 'MONTH'];
+
+/**
+ * A report's rows as a chart (ADR-987), one of its counts or amounts at a time, its first amount
+ * until another is picked: periods as bars over time, as the sales report's are; other rows as
+ * bars across, the first ten in the report's order. One series, named in its title; each bar says
+ * its row and value on hover and to a screen reader, the table the whole of it. Below nothing, a
+ * bar is a hairline: a loss is read in the table.
+ */
+export function ReportChart({
+  result,
+  breakdown,
+}: {
+  result: CustomReportResultValue;
+  breakdown: CustomReportBreakdown;
+}) {
+  const { t } = useLocale();
+  const [picked, setPicked] = useState<string | null>(null);
+  const charted = result.columns.flatMap((column, at) =>
+    column.kind === 'RATIO' ? [] : [{ column, at }],
+  );
+  const chosen =
+    charted.find((each) => each.column.key === picked) ??
+    charted.find((each) => each.column.kind === 'AMOUNT') ??
+    charted[0];
+  if (!chosen || result.rows.length === 0) return null;
+  const overTime = OVER_TIME.includes(breakdown);
+  const rows = overTime ? result.rows : result.rows.slice(0, CHART_ROWS);
+  const valueOf = (row: (typeof rows)[number]) => Math.max(Number(row.values[chosen.at] ?? 0), 0);
+  const most = Math.max(...rows.map(valueOf), 1);
+  const title = t('reports.chartOf', { column: chosen.column.title });
+  const labelOf = (row: (typeof rows)[number]) =>
+    t('reports.chartBar', {
+      row: row.label,
+      value: cellText(row.values[chosen.at] ?? null, chosen.column),
+    });
+  const bar = (value: number) => (value > 0 ? 'bg-primary' : 'bg-line');
+  const share = (value: number) => `${Math.max((value / most) * 100, value > 0 ? 2 : 1)}%`;
+  return (
+    <FormSection title={title}>
+      {charted.length > 1 && (
+        <SelectField
+          label={t('reports.chartColumn')}
+          value={chosen.column.key}
+          options={charted.map(({ column }) => ({ value: column.key, label: column.title }))}
+          onChange={setPicked}
+        />
+      )}
+      {overTime ? (
+        <>
+          <ul className="flex h-40 items-end gap-px" aria-label={title}>
+            {rows.map((row, index) => (
+              <li
+                key={row.key ?? `${row.label}-${index}`}
+                aria-label={labelOf(row)}
+                title={labelOf(row)}
+                className="flex h-full min-w-0 flex-1 items-end"
+              >
+                <span
+                  className={`w-full rounded-t-sm ${bar(valueOf(row))}`}
+                  style={{ height: share(valueOf(row)) }}
+                />
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-between text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+            <span>{rows[0]!.label}</span>
+            <span>{rows.at(-1)!.label}</span>
+          </div>
+        </>
+      ) : (
+        <ul className="flex flex-col gap-2" aria-label={title}>
+          {rows.map((row, index) => (
+            <li
+              key={row.key ?? `${row.label}-${index}`}
+              aria-label={labelOf(row)}
+              title={labelOf(row)}
+              className="grid grid-cols-[minmax(0,10rem)_1fr] items-center gap-3"
+            >
+              <span
+                aria-hidden
+                dir="auto"
+                className="truncate text-[length:var(--hatti-type-body-sm-size)]"
+              >
+                {row.label}
+              </span>
+              <span className="h-3">
+                <span
+                  className={`block h-full rounded-e-sm ${bar(valueOf(row))}`}
+                  style={{ width: share(valueOf(row)) }}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </FormSection>
+  );
+}
+
 /** What a report shows: a row each, the period's total last for one of sales. */
 export function ReportTable({ result }: { result: CustomReportResultValue }) {
   const { t } = useLocale();
@@ -587,6 +691,7 @@ export function ReportPage() {
           />
         </FormSection>
       )}
+      <ReportChart result={result} breakdown={report.breakdown} />
       <FormSection title={t('reports.shows')}>
         <ReportTable result={result} />
       </FormSection>

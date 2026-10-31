@@ -43,8 +43,8 @@ const MONTHLY: CustomReportValue = {
   period: 'LAST_MONTH',
 };
 
-function core(role: StaffRole) {
-  const reports: CustomReportValue[] = [MONTHLY];
+function core(role: StaffRole, more: CustomReportValue[] = []) {
+  const reports: CustomReportValue[] = [MONTHLY, ...more];
   return fakeCore(
     role,
     (operation, variables) => {
@@ -291,6 +291,43 @@ describe('Custom reports in the admin (ANL-06, ADR-819)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'New report' }));
     const rows = screen.getByLabelText('Rows') as HTMLSelectElement;
     expect([...rows.options].map((option) => option.value)).not.toContain('STORES');
+  });
+
+  it('charts a report, its first amount until another of its counts or amounts is picked (ADR-987)', async () => {
+    vi.stubGlobal('fetch', core('accountant').fetcher);
+    renderAdmin('/shop_1/analytics/reports/crep_1');
+
+    const chart = await screen.findByRole('list', { name: 'Net sales, as a chart' });
+    expect(
+      within(chart)
+        .getAllByRole('listitem')
+        .map((bar) => bar.getAttribute('aria-label')),
+    ).toEqual(['Online store: Rs 48,500', 'WhatsApp: Rs 9,000']);
+    // Its ratios are read in the table alone.
+    const picker = screen.getByLabelText('Chart') as HTMLSelectElement;
+    expect([...picker.options].map((option) => option.textContent)).toEqual([
+      'Orders',
+      'Net sales',
+    ]);
+    fireEvent.change(picker, { target: { value: 'orders' } });
+    const orders = screen.getByRole('list', { name: 'Orders, as a chart' });
+    expect(
+      within(orders)
+        .getAllByRole('listitem')
+        .map((bar) => bar.getAttribute('aria-label')),
+    ).toEqual(['Online store: 12', 'WhatsApp: 3']);
+    cleanup();
+
+    // A report of periods, over time.
+    vi.stubGlobal(
+      'fetch',
+      core('accountant', [{ ...MONTHLY, id: 'crep_2', name: 'By month', breakdown: 'MONTH' }])
+        .fetcher,
+    );
+    renderAdmin('/shop_1/analytics/reports/crep_2');
+    const months = await screen.findByRole('list', { name: 'Net sales, as a chart' });
+    expect(months.className).toContain('items-end');
+    expect(within(months).getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('shows a report, downloads it, emails it on a schedule, changes it and deletes it', async () => {
