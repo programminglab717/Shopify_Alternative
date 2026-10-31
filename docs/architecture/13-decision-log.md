@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-987 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-989 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -995,6 +995,8 @@
 | 985 | A custom report may be of this shop and the owner's stores abroad, run and scheduled by the owner alone | Accepted |
 | 986 | A collection's buy button may show the products it leads with as cards side by side | Accepted |
 | 987 | A custom report's page charts it, one of its counts or amounts at a time | Accepted |
+| 988 | The outbox is kept in daily partitions, a week made ahead, past days dropped whole unless one of their events is waiting | Accepted |
+| 989 | The pilot runs on one machine: the repository's images composed, Caddy in front taking each shop's certificate on demand | Accepted |
 
 ---
 
@@ -31840,3 +31842,51 @@
 * **Consequences:**
   * A shop sees the shape of a report at a glance before reading its numbers.
   * The chart is the admin's alone: the emailed workbook stays a table.
+
+## ADR-988 · The outbox is kept in daily partitions, a week made ahead, past days dropped whole unless one of their events is waiting
+
+* **Context:** every change's events go through `platform.outbox_events`, and the worker's sweep
+  deleted those published more than seven days ago, row by row (ADR-746). At a pilot's volume
+  that is fine; at a launch's, a table that is mostly deleted rows bloats, and the deletes
+  themselves are heavy. Phase 0's shortcut 1 left daily partitions for before launch.
+* **Decision:**
+  * **Partitioned by the UTC day an event occurred** (migration 0434), its key the event's ID and
+    its time. A default partition takes any event whose day has none yet, so an insert never
+    fails. Its policies, grants, indexes and notify trigger are as before; the partitions are
+    granted to no one, so the tables are reached through the parent alone.
+  * **The worker's retention sweep keeps them** (`maintainOutboxPartitions`): it makes today's
+    and the next seven days' partitions, each first taking what the default holds of its day, and
+    drops a past day's whole once the day is before the cut-off and none of its events is waiting,
+    parked or published since the cut-off. The published events left in a kept day are deleted
+    by the sweep as before.
+  * **Both are SQL functions** (`platform.outbox_make_partitions`, `outbox_drop_partitions`),
+    run by the system role and owning nothing themselves.
+* **Consequences:**
+  * Dropping a day is one statement, whatever it held.
+  * An event's ID alone no longer makes it unique in the table; its ID is a UUIDv7, its own.
+
+
+## ADR-989 · The pilot runs on one machine: the repository's images composed, Caddy in front taking each shop's certificate on demand
+
+* **Context:** the cloud cell (10 §3) waits on the hosting decision (OWN-03) and a registry
+  (OWN-04). A pilot of 5 to 10 shops needs neither: it needs the same code running somewhere,
+  with HTTPS for the admin, the API and every shop's host, backups, and a way to restore them.
+* **Decision:**
+  * **`deploy/pilot`:** a Compose file of Postgres, Valkey, the core's API and worker, the
+    storefront and Caddy, the images built on the machine from the repository's Dockerfile, with
+    setup and migrations run before the services start. `init.sh` writes its settings from a
+    template, every password and key generated afresh; `backup.sh` dumps the database, keeping 14
+    days; `restore.sh` restores one after asking. Its README is the runbook.
+  * **Caddy, open source, in front:** the admin's built files with the headers its build now also
+    writes for Caddy (`_headers.caddy`), the core's paths on the admin's origin, the API at its
+    own host, and every shop's host with a certificate from Let's Encrypt taken the first time it
+    is asked for, but only once the storefront says the host is the platform's, a shop's subdomain
+    or a shop's verified domain (`/_hatti/tls-ask`). The Dockerfile's `edge` target builds it.
+  * **CI checks it:** it builds the proxy's image, has Caddy validate its configuration with the
+    pilot's hosts, and has Compose read the pilot's file (`scripts/pilot-check.sh`).
+  * **Files stay in S3:** production refuses a local directory, so the pilot keeps them in R2's
+    free tier, or any S3-compatible store.
+* **Consequences:**
+  * The pilot needs a machine, a domain and a bucket, and nothing paid.
+  * One machine is one point of failure, its backups hours apart: the runbook says so, and the
+    cloud cell replaces it before more shops come.
