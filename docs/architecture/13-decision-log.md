@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-985 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-987 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -993,6 +993,8 @@
 | 983 | An expansion store's margin by a list metafield matches any one of its lines | Accepted |
 | 984 | A collection's buy button may lead with up to three of its products, in the order chosen | Accepted |
 | 985 | A custom report may be of this shop and the owner's stores abroad, run and scheduled by the owner alone | Accepted |
+| 986 | A collection's buy button may show the products it leads with as cards side by side | Accepted |
+| 987 | A custom report's page charts it, one of its counts or amounts at a time | Accepted |
 
 ---
 
@@ -31782,7 +31784,7 @@
     chosen, until three or until none is left.
 * **Consequences:**
   * A shop leads its embedded collection with a few products it wants seen.
-  * Not yet: another layout for the ones featured.
+  * Not yet: another layout for the ones featured (built, ADR-986).
 
 
 ## ADR-985 · A custom report may be of this shop and the owner's stores abroad, run and scheduled by the owner alone
@@ -31806,4 +31808,35 @@
 * **Consequences:**
   * The owner gets the stores' sales in a workbook by email, daily, weekly or monthly.
   * Others of the shop's staff see the report in the list but cannot run it.
-  * Not yet: a chart in custom reports.
+  * Not yet: a chart in custom reports (built, ADR-987).
+
+## ADR-986 · A collection's buy button may show the products it leads with as cards side by side
+
+* **Context:** ADR-980 and ADR-984 show the products a collection's buy button leads with each
+  across, its photo beside it. On a wide page, three of those stacked take a lot of height, and a
+  shop may want them as a row of cards instead. ADR-984 left another layout for the ones featured
+  as not yet.
+* **Decision:** the snippet's `data-featured-layout` is `horizontal`, the default, said in the
+  snippet only when another is chosen, or `card`: the featured products as cards side by side in
+  a row of their own, above the collection's grid, list or carousel. The admin's card offers it
+  once a product is featured.
+* **Consequences:**
+  * A shop's leading products fit a wide page as a row, or a narrow one stacked.
+
+
+## ADR-987 · A custom report's page charts it, one of its counts or amounts at a time
+
+* **Context:** custom reports (ADR-817, ADR-819) are a table; the sales report beside them has
+  a chart. ADR-985 left a chart in custom reports as not yet.
+* **Decision:**
+  * **One series at a time:** the report's first amount, or its first count, until the shop
+    picks another of its counts or amounts; ratios are read in the table alone. Its title names
+    the column, so there is no legend.
+  * **Its form follows the rows:** days, weeks or months as bars over time, as the sales report's
+    are, their first and last named under them; any other rows as bars across, the first ten in
+    the report's order, each named beside its bar.
+  * **Each bar says its row and value** on hover and to a screen reader; the table under it is
+    the whole of the report. A value below nothing draws as a hairline, a loss read in the table.
+* **Consequences:**
+  * A shop sees the shape of a report at a glance before reading its numbers.
+  * The chart is the admin's alone: the emailed workbook stays a table.
