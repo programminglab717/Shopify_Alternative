@@ -464,4 +464,83 @@ describe('Buy buttons (CH-08, ADR-860)', () => {
     expect(titlesOf('.grid > div')).toEqual(['khussa']);
     await window.happyDOM.close();
   });
+
+  it('lays the products a collection leads with out as cards in a row of their own (ADR-986)', async () => {
+    const origin = 'https://zari.hatti.pk';
+    expect(
+      buyButtonSnippet(origin, 'eid', 'en', {
+        collection: true,
+        featured: ['shawl', 'kurta'],
+        featuredLayout: 'card',
+      }),
+    ).toContain('data-featured="shawl,kurta" data-featured-layout="card"');
+    // Its default, one unknown, or with nothing featured, is left out.
+    for (const options of [
+      { featured: ['shawl'], featuredLayout: 'horizontal' },
+      { featured: ['shawl'], featuredLayout: '"><x' },
+      { featured: [], featuredLayout: 'card' },
+    ]) {
+      expect(buyButtonSnippet(origin, 'eid', 'en', { collection: true, ...options })).not.toContain(
+        'data-featured-layout',
+      );
+    }
+
+    const product = (handle: string): BuyButtonProduct => ({
+      handle,
+      title: handle,
+      url: `${origin}/products/${handle}`,
+      image: null,
+      currency: 'PKR',
+      variants: [
+        {
+          id: `v-${handle}`,
+          title: 'Default',
+          available: true,
+          price: '1500.00',
+          compareAtPrice: null,
+        },
+      ],
+    });
+    const window = new Window({ url: 'https://blog.example.pk/' });
+    const document = window.document;
+    document.body.innerHTML =
+      '<div data-hatti-buy-collection="eid" data-featured="shawl,kurta" data-featured-layout="card"></div>';
+    window.fetch = (async (url: string) => {
+      const handle = url.split('/').pop()!;
+      return {
+        ok: true,
+        json: async () =>
+          url.includes('/products/')
+            ? product(handle)
+            : {
+                handle: 'eid',
+                title: 'Eid',
+                url: `${origin}/collections/eid`,
+                products: ['kurta', 'dupatta', 'shawl'].map(product),
+              },
+      };
+    }) as never;
+    const script = document.createElement('script');
+    script.setAttribute('src', `${origin}/buy-button.js`);
+    Object.defineProperty(document, 'currentScript', { value: script });
+    window.eval(BUY_BUTTON_SCRIPT);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const root = document.querySelector('[data-hatti-buy-collection]')!.shadowRoot!;
+    const leads = [...root.querySelectorAll('.leads > .featured')];
+    expect(leads.map((cell) => cell.getAttribute('data-layout'))).toEqual([null, null]);
+    expect(
+      leads.map((cell) => cell.shadowRoot!.querySelector('.card')!.getAttribute('class')),
+    ).toEqual(['card', 'card']);
+    expect(leads.map((cell) => cell.shadowRoot!.querySelector('.title')!.textContent)).toEqual([
+      'shawl',
+      'kurta',
+    ]);
+    expect(
+      [...root.querySelectorAll('.grid > div')].map(
+        (cell) => cell.shadowRoot!.querySelector('.title')!.textContent,
+      ),
+    ).toEqual(['dupatta']);
+    await window.happyDOM.close();
+  });
 });

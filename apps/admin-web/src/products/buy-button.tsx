@@ -9,6 +9,9 @@ import { FormSection } from './product-form';
 /** The most products a collection's embed leads with, as the storefront's script shows (ADR-984). */
 export const BUY_BUTTON_FEATURED = 3;
 
+/** How the products it leads with are laid out, the first the default (ADR-986). */
+export const BUY_BUTTON_FEATURED_LAYOUTS = ['horizontal', 'card'] as const;
+
 /** The colour the buttons take until the shop picks its own: the platform's teal. */
 const DEFAULT_COLOR = '#0f766e';
 
@@ -24,7 +27,8 @@ export const BUY_BUTTON_LAYOUTS = {
 /**
  * The snippet another website pastes to show the product, or with `collection` the collection
  * (ADR-925), as the storefront serves it; its buttons in `color` where given, laid out as
- * `layout` says (ADR-949); a collection's led by its products `featured` (ADR-980, ADR-984).
+ * `layout` says (ADR-949); a collection's led by its products `featured` (ADR-980, ADR-984),
+ * laid out as `featuredLayout` says (ADR-986).
  */
 export function buyButtonSnippet(
   storefront: string,
@@ -35,6 +39,7 @@ export function buyButtonSnippet(
     color?: string | null;
     layout?: string | null;
     featured?: readonly string[];
+    featuredLayout?: string | null;
   } = {},
 ): string {
   const origin = storefront.replace(/\/+$/, '');
@@ -51,8 +56,15 @@ export function buyButtonSnippet(
       (options.featured ?? []).map((each) => each.replace(/[^a-z0-9-]/g, '')).filter(Boolean),
     ),
   ].slice(0, BUY_BUTTON_FEATURED);
+  const featuredLayout =
+    options.featuredLayout &&
+    (BUY_BUTTON_FEATURED_LAYOUTS as readonly string[]).indexOf(options.featuredLayout) > 0
+      ? ` data-featured-layout="${options.featuredLayout}"`
+      : '';
   const featured =
-    options.collection && leads.length > 0 ? ` data-featured="${leads.join(',')}"` : '';
+    options.collection && leads.length > 0
+      ? ` data-featured="${leads.join(',')}"${featuredLayout}`
+      : '';
   return (
     `<div ${kind}="${handle}"${lang}${color}${layout}${featured}></div>\n` +
     `<script src="${origin}/buy-button.js" async></script>`
@@ -85,6 +97,7 @@ export function BuyButtonCard({
   const [color, setColor] = useState<string | null>(null);
   const [layout, setLayout] = useState<string>(collection ? 'grid' : 'card');
   const [featured, setFeatured] = useState<string[]>([]);
+  const [featuredLayout, setFeaturedLayout] = useState<string>('horizontal');
   const [copied, setCopied] = useState(false);
   if (!active || !storefront) return null;
   const snippet = buyButtonSnippet(storefront, handle, language, {
@@ -92,6 +105,7 @@ export function BuyButtonCard({
     color,
     layout,
     featured,
+    featuredLayout,
   });
   return (
     <FormSection
@@ -149,6 +163,20 @@ export function BuyButtonCard({
               }}
             />
           ))}
+      {collection && featured.length > 0 && (
+        <SelectField
+          label={t('buyButton.featuredLayout')}
+          value={featuredLayout}
+          options={BUY_BUTTON_FEATURED_LAYOUTS.map((value) => ({
+            value,
+            label: t(`buyButton.featuredLayout.${value}`),
+          }))}
+          onChange={(value) => {
+            setFeaturedLayout(value);
+            setCopied(false);
+          }}
+        />
+      )}
       <CheckField
         label={t('buyButton.ownColor')}
         checked={color !== null}

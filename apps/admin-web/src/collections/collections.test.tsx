@@ -219,6 +219,13 @@ describe('Collections', () => {
     expect([...second.options].map((option) => option.textContent)).toEqual(['None', 'Lawn suit']);
     fireEvent.change(second, { target: { value: 'lawn-suit' } });
     expect(within(card).getByText(/data-featured="dupatta,lawn-suit"/)).toBeTruthy();
+    // Laid out as cards side by side, rather than each across (ADR-986).
+    fireEvent.change(within(card).getByLabelText('Featured products shown'), {
+      target: { value: 'card' },
+    });
+    expect(
+      within(card).getByText(/data-featured="dupatta,lawn-suit" data-featured-layout="card"/),
+    ).toBeTruthy();
     // No third: the collection's two active products are both chosen.
     expect(within(card).queryByLabelText('Featured product 3, after the one before')).toBeNull();
     fireEvent.change(featured, { target: { value: '' } });

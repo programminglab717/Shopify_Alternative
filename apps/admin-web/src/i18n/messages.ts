@@ -6320,6 +6320,9 @@ const en = {
   'buyButton.featured': 'Featured product, shown first and across',
   'buyButton.featuredNone': 'None',
   'buyButton.featuredMore': 'Featured product {n}, after the one before',
+  'buyButton.featuredLayout': 'Featured products shown',
+  'buyButton.featuredLayout.horizontal': 'Each across, its photo beside it',
+  'buyButton.featuredLayout.card': 'As cards, side by side',
   'certification.title': 'Hatti certification',
   'certification.hint':
     'Read the lessons, then answer the ten questions: {mark} right certify you for a year, and shops see it on your expert profile.',
@@ -13649,6 +13652,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'buyButton.featured': 'نمایاں پروڈکٹ، سب سے پہلے اور آڑی',
   'buyButton.featuredNone': 'کوئی نہیں',
   'buyButton.featuredMore': 'نمایاں پروڈکٹ {n}، پچھلی کے بعد',
+  'buyButton.featuredLayout': 'نمایاں پروڈکٹس کی ترتیب',
+  'buyButton.featuredLayout.horizontal': 'ہر ایک آڑی، تصویر ساتھ میں',
+  'buyButton.featuredLayout.card': 'کارڈز، ساتھ ساتھ',
   'certification.title': 'Hatti سرٹیفکیشن',
   'certification.hint':
     'اسباق پڑھیں، پھر دس سوالوں کے جواب دیں: {mark} درست ہوں تو آپ ایک سال کے لیے سرٹیفائیڈ ہیں، اور دکانیں یہ آپ کے ماہر پروفائل پر دیکھتی ہیں۔',
