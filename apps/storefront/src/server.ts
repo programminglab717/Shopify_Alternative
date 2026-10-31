@@ -457,6 +457,13 @@ const PAUSE_OPEN_ROUTES = new Set([
  */
 export const HEALTH_PATHS = { live: '/healthz', ready: '/readyz' } as const;
 
+/**
+ * Asked by the proxy in front before it takes a certificate for a host on demand (ADR-989):
+ * `?domain=` a host it was asked for. 200 for the platform's domain, a shop's subdomain or a
+ * shop's verified domain; 404 for any other, so no certificate is taken for a host no shop has.
+ */
+export const TLS_ASK_PATH = '/_hatti/tls-ask';
+
 /** Whether `probe` answers within two seconds. */
 async function answers(probe: () => Promise<unknown>, timeoutMs = 2_000): Promise<boolean> {
   let timer: NodeJS.Timeout | undefined;
@@ -859,6 +866,20 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     return reply
       .code(ok ? 200 : 503)
       .send({ status: ok ? 'ok' : 'unavailable', checks: { redis: ok ? 'ok' : 'failed' } });
+  });
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.url.split('?', 1)[0] !== TLS_ASK_PATH) return;
+    reply.header('cache-control', 'no-store');
+    const asked = new URL(request.url, 'http://ask').searchParams.get('domain') ?? '';
+    const handle = handleOf(asked, domain);
+    let known = handle === null;
+    if (handle !== null && asked.length <= 253 && shops && domainShops) {
+      known =
+        (handle === undefined
+          ? await domainShops.find(hostName(asked))
+          : await shops.find(handle)) !== null;
+    }
+    return reply.code(known ? 200 : 404).send({ known });
   });
   // An answer that sets a cookie is the shopper's own, whatever its handler said: never kept.
   app.addHook('onSend', async (request, reply, payload) => {

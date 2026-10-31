@@ -5,6 +5,7 @@ import { precacheOf } from '../offline/rules';
 import {
   CACHE_RULES,
   CONTENT_SECURITY_POLICY,
+  caddyHeaders,
   contentSecurityPolicy,
   headersFile,
   securityHeaders,
@@ -91,5 +92,20 @@ describe("The admin's edge headers", () => {
       '/',
       '/assets/index-a1.js',
     ]);
+  });
+
+  it("writes the same headers and cache rules for the pilot's proxy, as Caddy reads them (ADR-989)", () => {
+    const file = caddyHeaders();
+    const lines = file.trimEnd().split('\n');
+    expect(lines[0]).toBe('header {');
+    for (const [name, value] of Object.entries(securityHeaders()))
+      expect(lines).toContain(`\t${name} "${value}"`);
+    expect(lines).toContain('@cache0 path /');
+    expect(lines).toContain('header @cache0 Cache-Control "no-cache"');
+    expect(lines).toContain('@cache3 path /assets/*');
+    expect(lines).toContain('header @cache3 Cache-Control "public, max-age=31536000, immutable"');
+    // A quote in a value would end it early: none of the headers has one to escape.
+    expect(Object.values(securityHeaders()).some((value) => value.includes('"'))).toBe(false);
+    expect(precacheOf(['_headers.caddy', 'index.html'])).toEqual(['/']);
   });
 });

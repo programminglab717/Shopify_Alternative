@@ -13,3 +13,6 @@
 .storage
 *.rdb
 docs
+# The pilot's secrets and backups stay on its machine (deploy/pilot, ADR-989).
+deploy/pilot/hatti.env
+deploy/pilot/backups

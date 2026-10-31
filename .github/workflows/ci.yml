@@ -197,3 +197,17 @@ jobs:
 
       - name: Run them against an empty database
         run: scripts/image-smoke.sh
+
+      # The pilot's proxy (ADR-989): Caddy with the admin's files, its configuration checked as
+      # Caddy reads it, and the pilot's compose file as Compose does.
+      - name: Build the pilot's proxy
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: edge
+          tags: hatti-edge:ci
+          load: true
+          cache-from: type=gha
+
+      - name: Check the pilot's proxy and compose file
+        run: scripts/pilot-check.sh

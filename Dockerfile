@@ -4,6 +4,7 @@
 #
 #   docker build --target core -t hatti-core .
 #   docker build --target storefront -t hatti-storefront .
+#   docker build --target edge -t hatti-edge .        # the pilot's proxy, with the admin (ADR-989)
 #
 # The core image runs the Admin API by default; the worker, migrations and the core's command-line
 # tools are other commands of the same image:
@@ -61,3 +62,13 @@ COPY --from=build /out/storefront /app
 WORKDIR /app/apps/storefront
 EXPOSE 4100
 CMD ["node", "--enable-source-maps", "--import", "./dist/cli/instrumentation.js", "dist/cli/serve.js"]
+
+# The admin built to static files, for the pilot's proxy; in the cloud the edge serves them.
+FROM build AS admin
+RUN pnpm --filter "@hatti/admin-web..." run build
+
+# The pilot's proxy (ADR-989): Caddy, open source, taking certificates from Let's Encrypt, with the
+# admin's files and the headers its build writes for Caddy (deploy/pilot/Caddyfile).
+FROM caddy:2.10.2-alpine AS edge
+COPY --from=admin /app/apps/admin-web/dist /srv/admin
+COPY deploy/pilot/Caddyfile /etc/caddy/Caddyfile

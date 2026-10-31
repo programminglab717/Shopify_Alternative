@@ -5,7 +5,7 @@ import { themeStylesheet } from '@hatti/tokens';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vitest/config';
-import { headersFile, securityHeaders } from './src/edge/headers.ts';
+import { caddyHeaders, headersFile, securityHeaders } from './src/edge/headers.ts';
 import { precacheOf } from './src/offline/rules.ts';
 
 const TOKENS = 'virtual:hatti-tokens.css';
@@ -58,6 +58,8 @@ function edgeHeaders(): Plugin {
     name: 'hatti-edge-headers',
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: '_headers', source: headersFile() });
+      // The same for the pilot's proxy (ADR-989).
+      this.emitFile({ type: 'asset', fileName: '_headers.caddy', source: caddyHeaders() });
     },
     configurePreviewServer(server) {
       const headers = Object.entries(securityHeaders());

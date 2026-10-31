@@ -84,3 +84,23 @@ export function headersFile(): string {
     lines.push(path, `  Cache-Control: ${cacheControl}`);
   return `${lines.join('\n')}\n`;
 }
+
+/**
+ * The same headers and cache rules for Caddy, the pilot's proxy (ADR-989): a file its admin site
+ * imports, written beside the build as `_headers.caddy`, so the pilot sends what the edge does.
+ */
+export function caddyHeaders(): string {
+  const quoted = (value: string) => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  const lines = [
+    'header {',
+    ...Object.entries(securityHeaders()).map(([name, value]) => `\t${name} ${quoted(value)}`),
+    '}',
+  ];
+  for (const [at, [path, cacheControl]] of CACHE_RULES.entries()) {
+    lines.push(
+      `@cache${at} path ${path}`,
+      `header @cache${at} Cache-Control ${quoted(cacheControl)}`,
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}

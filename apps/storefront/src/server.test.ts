@@ -6861,6 +6861,33 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     await fresh.close();
   });
 
+  it('tells the proxy in front which hosts a certificate may be taken for (ADR-989)', async () => {
+    const tia = randomUUID();
+    const sample = sampleStore();
+    await publish(tia, 'tia', {
+      ...sample,
+      shop: { ...sample.shop, handle: 'tia', domain: 'www.tia.pk', domains: ['www.tia.pk'] },
+    });
+    await directory.setDomains(tia, ['www.tia.pk']);
+    const app = server();
+    const ask = async (domain: string) => {
+      const answer = await app.inject({
+        method: 'GET',
+        url: `/_hatti/tls-ask?domain=${encodeURIComponent(domain)}`,
+        headers: { host: 'storefront:4100' },
+      });
+      return answer.statusCode;
+    };
+    // The platform's domain, a shop's subdomain and its own domain; nothing else.
+    expect(await ask('localhost')).toBe(200);
+    expect(await ask('tia.localhost')).toBe(200);
+    expect(await ask('WWW.TIA.PK.')).toBe(200);
+    expect(await ask('nobody.localhost')).toBe(404);
+    expect(await ask('www.tia.pk.evil.pk')).toBe(404);
+    expect(await ask('')).toBe(404);
+    await app.close();
+  });
+
   it("tells crawlers the shop's own address, and lists what Valkey has", async () => {
     const app = createStorefrontServer({
       theme,

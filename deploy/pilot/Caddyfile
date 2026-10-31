@@ -1,0 +1,56 @@
+# The pilot's proxy (ADR-989): Caddy, open source, in front of the core and the storefront on one
+# machine, taking a certificate from Let's Encrypt for each host it serves. Its hosts come from the
+# environment, as compose.yml gives it them from hatti.env:
+#
+#   ADMIN_HOST        admin.example.pk    the admin's files, and the core's paths on its origin
+#   API_HOST          api.example.pk      the core's public address (PUBLIC_URL)
+#   STOREFRONT_HOST   example.pk          the platform's domain; shops at {handle}.example.pk
+#   ACME_EMAIL        ops@example.pk      told by Let's Encrypt of certificates it cannot renew
+#
+# Shops' subdomains and their own domains are served by the last site, a certificate taken for
+# each the first time it is asked for, once the storefront says the host is a shop's
+# (/_hatti/tls-ask): never for a host no shop has.
+
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://storefront:4100/_hatti/tls-ask
+	}
+}
+
+# The admin: its built files, the page itself for every route the app has, and the core's paths
+# on the same origin, as the edge sends them in the cloud (apps/admin-web/vite.config.ts).
+{$ADMIN_HOST} {
+	encode zstd gzip
+	import /srv/admin/_headers.caddy
+	# The app's own routes are its page: asked for again each time, as the page itself is.
+	@page not path /assets/* /admin/api/* /admin/errors /admin/errors/* /auth /auth/*
+	header @page Cache-Control "no-cache"
+	@core path /admin/api/* /admin/errors /admin/errors/* /auth /auth/*
+	handle @core {
+		reverse_proxy api:4000
+	}
+	handle {
+		root * /srv/admin
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# The core's public address: customers' links, checkout's returns, apps' OAuth, couriers' and
+# gateways' webhooks.
+{$API_HOST} {
+	encode zstd gzip
+	reverse_proxy api:4000
+}
+
+# The platform's domain and every shop's host, each certificate taken on demand.
+{$STOREFRONT_HOST}, https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	# The proxy's own question is the proxy's alone.
+	respond /_hatti/tls-ask 404
+	reverse_proxy storefront:4100
+}
