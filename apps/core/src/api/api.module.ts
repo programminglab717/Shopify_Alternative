@@ -81,6 +81,8 @@ import { ThemeStoreResolver } from './theme-store.resolver.js';
 import { AppChargeResolver } from './app-charges.resolver.js';
 import { ExpansionCopier } from '../expansion-copier.js';
 import { ExpansionSales } from '../expansion-sales.js';
+import { CliLogins, MemoryCliLoginStore, RedisCliLoginStore } from '../cli-logins.js';
+import { CliLoginResolver } from './cli-logins.resolver.js';
 import { ExpansionStoreResolver } from './expansion-stores.resolver.js';
 import { FunctionInputsResolver } from './function-inputs.resolver.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
@@ -143,6 +145,11 @@ export interface ApiModuleOptions {
   identity: IdentityServiceOptions;
   logger: Logger;
   redis?: Redis | null;
+  /**
+   * The logins terminals wait on (ADR-990), shared with the routes they ask through; kept in
+   * Valkey where there is one, else in this process's memory, unless given.
+   */
+  cliLogins?: CliLogins;
   /**
    * How queries are costed and their callers throttled (ADR-576); without it, nothing is, and
    * answers carry no `extensions.cost`.
@@ -244,6 +251,24 @@ export interface ApiModuleOptions {
   shopifyStores?: ShopifyStores;
 }
 
+/** Where staff use the admin: its origin, for links that open it. */
+export function adminOriginOf(options: ApiModuleOptions): string {
+  return new URL(
+    options.identity.emails?.adminUrl ??
+      options.identity.passkeys?.origins[0] ??
+      'http://localhost:5173',
+  ).origin;
+}
+
+/** The logins terminals wait on: in Valkey where there is one, else in memory. */
+export function cliLoginsOf(options: ApiModuleOptions): CliLogins {
+  return new CliLogins(
+    options.redis ? new RedisCliLoginStore(options.redis) : new MemoryCliLoginStore(),
+    options.identity.secretBox,
+    adminOriginOf(options),
+  );
+}
+
 /** Resources owned by the process entry point, shared with every module. */
 @Global()
 @Module({})
@@ -262,12 +287,9 @@ class InfrastructureModule {
         { provide: REDIS, useValue: options.redis ?? null },
         {
           provide: ADMIN_ORIGIN,
-          useValue: new URL(
-            options.identity.emails?.adminUrl ??
-              options.identity.passkeys?.origins[0] ??
-              'http://localhost:5173',
-          ).origin,
+          useValue: adminOriginOf(options),
         },
+        { provide: CliLogins, useValue: options.cliLogins ?? cliLoginsOf(options) },
         {
           provide: PublicSite,
           useValue: new PublicSite(options.publicUrl ?? 'http://localhost:4000'),
@@ -324,6 +346,7 @@ class InfrastructureModule {
         CopiedVariantStock,
         ExpansionSales,
         StoreSalesSource,
+        CliLogins,
       ],
     };
   }
@@ -449,6 +472,7 @@ export class ApiModule {
         AppChargeResolver,
         ExpansionStoreResolver,
         ExpansionCopier,
+        CliLoginResolver,
         FunctionInputsResolver,
         FileUsesResolver,
         PaymentLinkOrdersResolver,

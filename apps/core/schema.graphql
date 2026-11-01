@@ -2223,6 +2223,52 @@ type ClaimedParcelEdge {
   node: ClaimedParcel!
 }
 
+"""
+A terminal's `hatti login` waiting to be approved (DEV-08, ADR-990): approving it makes a custom app for the terminal, whose token it is given once.
+"""
+type CliLogin {
+  """What the terminal asked for."""
+  access: CliLoginAccess!
+
+  """The code the terminal shows: XXXX-XXXX."""
+  code: String!
+
+  """The name the terminal gave itself, as a rule its computer’s."""
+  device: String!
+  expiresAt: DateTime!
+
+  """The address it asked from, as the API saw it."""
+  requestedFrom: String
+  status: CliLoginStatus!
+}
+
+enum CliLoginAccess {
+  """Reads what the role reads, and changes nothing."""
+  READ
+
+  """Reads and changes what the role does: every scope the role holds."""
+  WRITE
+}
+
+type CliLoginApprovePayload {
+  """The custom app made for the terminal, as Settings › Apps lists it."""
+  appName: String
+
+  """The scopes its token was given."""
+  scopes: [String!]!
+  userErrors: [UserError!]!
+}
+
+type CliLoginDenyPayload {
+  denied: Boolean!
+}
+
+enum CliLoginStatus {
+  APPROVED
+  DENIED
+  PENDING
+}
+
 """Orders, and the cash on delivery they still owe the shop."""
 type CodCash {
   amount: Money!
@@ -10047,6 +10093,11 @@ input MoveInput {
 
 type Mutation {
   """
+  The calling custom app's own token revoked, and the app removed: for a terminal's `hatti logout` (ADR-990). Its token stops working at once.
+  """
+  accessTokenRevoke: CustomAppDeletePayload!
+
+  """
   The shop's sales as a journal of debits and credits for its books (ANL-10, ADR-885): an entry for each day of the period in the shop's time zone, posting what its orders came to as salesReport has it, for Xero, QuickBooks or Tally to import, or as a CSV. True profit's lines on the plans that have them. Staff need to be an owner, a manager or an accountant. Every export is recorded in the audit log.
   """
   accountingJournalExport(
@@ -10289,6 +10340,14 @@ type Mutation {
   Replaces the badges the checkout's page shows, in the order given: up to 4, each once; CUSTOM ones once for each thing they say. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
   """
   checkoutTrustBadgesUpdate(badges: [CheckoutTrustBadgeInput!]!): CheckoutTrustBadgesUpdatePayload!
+
+  """
+  Lets the terminal showing the code in to the shop: a custom app named for it is made, with the scopes `access` gives of your role’s, and its token handed to the terminal once.
+  """
+  cliLoginApprove(access: CliLoginAccess!, code: String!): CliLoginApprovePayload!
+
+  """Refuses the terminal showing the code: it is told, and given nothing."""
+  cliLoginDeny(code: String!): CliLoginDenyPayload!
 
   """
   Imports a courier's remittance statement, as the CSV or the Excel workbook the courier sends: a row per parcel, found by its tracking number ("Tracking Number", "CN" and the like), with the cash collected ("COD Amount"), and the charges, tax withheld and net amount when it has them, under a header row the courier's title rows may come above. Each parcel's cash is received on its order, at most what the order owes, and its charges kept as the parcel's courierCharges, all in one go; cash for a parcel the courier lost pays the parcel's claim, filing one if the shop had not. Lines that match no parcel, or one paid for before, receive nothing and are kept to look into; other cash on a parcel whose order the courier paid short pays what it still owes (ADR-246). A statement is imported once: one with the same lines as one imported before, however it was saved, is refused. Staff need to be an owner, a manager or an accountant.
@@ -17058,6 +17117,11 @@ type Query {
   abandonedCheckouts(after: ID, first: Int): [AbandonedCheckout!]!
 
   """
+  The access scopes the caller holds: an app's token's, or a member of staff's role's.
+  """
+  accessScopes: [String!]!
+
+  """
   What the shop's staff and apps changed, the latest first: each change as the event it recorded, by whom and to what. What needs accounting for, with more about it, is on auditLog. Owners and managers, and apps with read_settings.
   """
   activityLog(
@@ -17254,6 +17318,9 @@ type Query {
 
   """The badges the shop chose for its checkout's page, in their order."""
   checkoutTrustBadges: [CheckoutTrustBadge!]!
+
+  """The `hatti login` a code names; null for none, or one that has ended."""
+  cliLogin(code: String!): CliLogin
 
   """
   A courier's dispute sheet (COD-10, ADR-605): the parcels it delivered olderThanDays days ago or more whose cash the shop has not had in full, as an Excel workbook to send it, the oldest first: each by tracking number, with its order, when it was delivered, its city, the cash it was to collect, what came of it and what is still owed. The courier is as codReceivables names it, in any letter case; none for parcels shipped without one.

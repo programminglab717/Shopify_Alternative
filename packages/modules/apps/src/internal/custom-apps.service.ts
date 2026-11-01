@@ -253,6 +253,22 @@ export class CustomAppService {
   }
 
   /**
+   * The calling custom app's own token revoked, as `hatti logout` gives up its login (ADR-990):
+   * the app is removed, as if its shop had. Only a custom app's token gives itself up; a public
+   * app is uninstalled by the shop.
+   */
+  async revokeOwn(tenant: TenantContext): Promise<MutationResult<CustomAppRecord>> {
+    if (tenant.actor.kind !== 'app') {
+      return failOne([], 'INVALID', 'Only an app gives up its own token');
+    }
+    // A public app's token is not one of these: the shop uninstalls the app.
+    const removed = await this.delete(tenant, tenant.actor.tokenId);
+    return removed.ok
+      ? removed
+      : failOne([], 'INVALID', "A public app's token goes when the shop uninstalls it");
+  }
+
+  /**
    * The secret an app's webhooks are signed with, opened; null for an app removed, or made before
    * apps had one. For the worker, which signs deliveries.
    */

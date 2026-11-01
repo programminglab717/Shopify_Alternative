@@ -142,6 +142,19 @@ export class CustomAppResolver {
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
+
+  @Mutation(() => CustomAppDeletePayload, {
+    description:
+      "The calling custom app's own token revoked, and the app removed: for a terminal's " +
+      '`hatti logout` (ADR-990). Its token stops working at once.',
+  })
+  async accessTokenRevoke(@CurrentTenant() tenant: TenantContext): Promise<CustomAppDeletePayload> {
+    const result = await this.service.revokeOwn(tenant);
+    return Object.assign(new CustomAppDeletePayload(), {
+      deletedCustomAppId: result.ok ? toPublicId('accessToken', result.value.id) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
 }
 
 async function withApp<T>(

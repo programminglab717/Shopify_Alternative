@@ -5323,6 +5323,32 @@ const en = {
   'oauth.noShop': 'Apps are installed by owners and managers: you are neither in any shop.',
   'oauth.install': 'Install app',
   'oauth.cancel': 'Cancel',
+  'cliLogin.title': 'Sign in a terminal',
+  'cliLogin.signInFirst': 'Sign in to Hatti to let your terminal in to a shop.',
+  'cliLogin.typeHint': 'Type the code your terminal shows after hatti login.',
+  'cliLogin.code': 'Code',
+  'cliLogin.badCode': 'A code is eight letters, as XXXX-XXXX.',
+  'cliLogin.next': 'Next',
+  'cliLogin.asks': '{device} asks to sign in to your shop',
+  'cliLogin.showsCode': 'Its terminal shows this code:',
+  'cliLogin.from': 'Asked from {address}',
+  'cliLogin.warning':
+    'Approve only if you ran hatti login yourself just now and your terminal shows this same code. Whoever holds the terminal, or an AI agent working in it, can then do in the shop what you let it, until you remove it in Settings › Apps. Never approve a code someone sent you.',
+  'cliLogin.shop': 'Shop',
+  'cliLogin.access': 'It may',
+  'cliLogin.read': 'Only read',
+  'cliLogin.write': 'Read and change things',
+  'cliLogin.accessHint':
+    'Either way, no more than your own role may. Only read is the safer choice for an AI agent.',
+  'cliLogin.approve': 'Let it in',
+  'cliLogin.deny': 'Refuse',
+  'cliLogin.approved':
+    'Your terminal is signed in to {shop}, as the app {app}. You can close this page. Remove it any time in Settings › Apps.',
+  'cliLogin.denied': 'Refused: the terminal was given nothing.',
+  'cliLogin.gone':
+    'This code has ended or was answered already. Run hatti login again for a new one.',
+  'cliLogin.noShop':
+    'Terminals are let in by owners and managers, as apps are: you are neither in any shop.',
   'partnerApps.title': 'Your apps',
   'partnerApps.hint':
     'Apps you build for shops to install. Until Hatti reviews one, it installs on your development stores alone.',
@@ -12658,6 +12684,32 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'oauth.noShop': 'ایپس مالک اور مینیجر انسٹال کرتے ہیں: آپ کسی دکان میں ان میں سے نہیں۔',
   'oauth.install': 'ایپ انسٹال کریں',
   'oauth.cancel': 'منسوخ کریں',
+  'cliLogin.title': 'ٹرمینل سائن ان کریں',
+  'cliLogin.signInFirst': 'اپنے ٹرمینل کو دکان میں آنے دینے کے لیے Hatti میں سائن ان کریں۔',
+  'cliLogin.typeHint': 'hatti login کے بعد آپ کا ٹرمینل جو کوڈ دکھاتا ہے، وہ لکھیں۔',
+  'cliLogin.code': 'کوڈ',
+  'cliLogin.badCode': 'کوڈ آٹھ حروف کا ہوتا ہے، جیسے XXXX-XXXX۔',
+  'cliLogin.next': 'آگے',
+  'cliLogin.asks': '{device} آپ کی دکان میں سائن ان ہونا چاہتا ہے',
+  'cliLogin.showsCode': 'اس کا ٹرمینل یہ کوڈ دکھاتا ہے:',
+  'cliLogin.from': '{address} سے مانگا گیا',
+  'cliLogin.warning':
+    'صرف تب اجازت دیں جب آپ نے ابھی خود hatti login چلایا ہو اور آپ کا ٹرمینل یہی کوڈ دکھا رہا ہو۔ پھر جس کے پاس ٹرمینل ہو، یا اس میں کام کرنے والا AI ایجنٹ، دکان میں وہ سب کر سکے گا جس کی آپ اجازت دیں، جب تک آپ اسے Settings › Apps میں ہٹا نہ دیں۔ کسی کا بھیجا ہوا کوڈ کبھی منظور نہ کریں۔',
+  'cliLogin.shop': 'دکان',
+  'cliLogin.access': 'یہ کر سکے',
+  'cliLogin.read': 'صرف دیکھنا',
+  'cliLogin.write': 'دیکھنا اور بدلنا',
+  'cliLogin.accessHint':
+    'دونوں صورتوں میں آپ کے اپنے رول سے زیادہ نہیں۔ AI ایجنٹ کے لیے صرف دیکھنا زیادہ محفوظ ہے۔',
+  'cliLogin.approve': 'آنے دیں',
+  'cliLogin.deny': 'انکار کریں',
+  'cliLogin.approved':
+    'آپ کا ٹرمینل {shop} میں ایپ {app} کے طور پر سائن ان ہو گیا۔ یہ صفحہ بند کر سکتے ہیں۔ اسے کبھی بھی Settings › Apps میں ہٹا سکتے ہیں۔',
+  'cliLogin.denied': 'انکار کر دیا: ٹرمینل کو کچھ نہیں دیا گیا۔',
+  'cliLogin.gone':
+    'یہ کوڈ ختم ہو چکا یا اس کا جواب دیا جا چکا۔ نئے کوڈ کے لیے hatti login دوبارہ چلائیں۔',
+  'cliLogin.noShop':
+    'ٹرمینل کو مالک اور مینیجر آنے دیتے ہیں، جیسے ایپس کو: آپ کسی دکان میں ان میں سے نہیں۔',
   'partnerApps.title': 'آپ کی ایپس',
   'partnerApps.hint':
     'وہ ایپس جو آپ دکانوں کے انسٹال کرنے کے لیے بناتے ہیں۔ جب تک Hatti جائزہ نہ لے، ایپ صرف آپ کے ڈویلپمنٹ اسٹورز پر انسٹال ہوتی ہے۔',

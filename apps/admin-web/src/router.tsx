@@ -142,6 +142,7 @@ import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { AccessRequestPage } from './shops/access-request-page';
 import { OAuthPage } from './shops/oauth-page';
+import { CliLoginPage } from './shops/cli-login-page';
 import { PartnerPage } from './shops/partner-page';
 import { ShopsPage } from './shops/shops-page';
 import { NewTransferPage, validateNewTransferSearch } from './transfers/new-transfer-page';
@@ -168,6 +169,7 @@ const PUBLIC_PATHS = [
   '/sign-up',
   '/invitation',
   '/oauth/authorize',
+  '/cli-login',
   '/sso/callback',
   '/forgot-password',
   '/reset-password',
@@ -1095,6 +1097,13 @@ const oauthAuthorize = createRoute({
   component: OAuthPage,
 });
 
+// Where `hatti login` sends its person to let a terminal in (DEV-08, ADR-990).
+const cliLogin = createRoute({
+  getParentRoute: () => root,
+  path: '/cli-login',
+  component: CliLoginPage,
+});
+
 // Where an organisation's identity provider sends staff back (ADM-09, ADR-864).
 const ssoCallback = createRoute({
   getParentRoute: () => root,
@@ -1113,6 +1122,7 @@ export const routeTree = root.addChildren([
   partners,
   invitation,
   oauthAuthorize,
+  cliLogin,
   ssoCallback,
   forgotPassword,
   resetPassword,

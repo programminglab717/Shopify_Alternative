@@ -6972,3 +6972,27 @@ export interface CustomerCreditLimitSetData {
     userErrors: UserError[];
   };
 }
+
+/** What a terminal's `hatti login` asked for (ADR-990). */
+export type CliLoginAccess = 'READ' | 'WRITE';
+
+export interface CliLogin {
+  code: string;
+  device: string;
+  access: CliLoginAccess;
+  requestedFrom: string | null;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  expiresAt: string;
+}
+
+export interface CliLoginData {
+  cliLogin: CliLogin | null;
+}
+
+export interface CliLoginApproveData {
+  cliLoginApprove: { appName: string | null; scopes: string[]; userErrors: UserError[] };
+}
+
+export interface CliLoginDenyData {
+  cliLoginDeny: { denied: boolean };
+}

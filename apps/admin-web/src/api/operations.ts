@@ -14113,3 +14113,38 @@ export const CustomerCreditLimitSetMutation = /* GraphQL */ `
     }
   }
 `;
+
+// hatti login, approved in the admin (DEV-08, ADR-990).
+export const CliLoginQuery = /* GraphQL */ `
+  query CliLogin($code: String!) {
+    cliLogin(code: $code) {
+      code
+      device
+      access
+      requestedFrom
+      status
+      expiresAt
+    }
+  }
+`;
+
+export const CliLoginApproveMutation = /* GraphQL */ `
+  mutation CliLoginApprove($code: String!, $access: CliLoginAccess!) {
+    cliLoginApprove(code: $code, access: $access) {
+      appName
+      scopes
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const CliLoginDenyMutation = /* GraphQL */ `
+  mutation CliLoginDeny($code: String!) {
+    cliLoginDeny(code: $code) {
+      denied
+    }
+  }
+`;

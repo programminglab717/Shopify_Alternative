@@ -15,14 +15,26 @@ import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 /** Where an install link waits while its merchant signs in. */
 const PENDING = 'hatti.oauth';
 
-/** The install link a merchant opened before signing in, if any; read once. */
+/**
+ * The install link a merchant opened before signing in, or a terminal's login link (ADR-990), if
+ * any; read once.
+ */
 export function takePendingInstall(): string | null {
   try {
     const link = window.sessionStorage.getItem(PENDING);
     window.sessionStorage.removeItem(PENDING);
-    return link?.startsWith('/oauth/authorize?') ? link : null;
+    return link?.startsWith('/oauth/authorize?') || link?.startsWith('/cli-login') ? link : null;
   } catch {
     return null;
+  }
+}
+
+/** Keeps `link` to open again once the merchant has signed in. */
+export function keepPendingLink(link: string): void {
+  try {
+    window.sessionStorage.setItem(PENDING, link);
+  } catch {
+    // Without storage they open the link again once signed in.
   }
 }
 
@@ -82,11 +94,7 @@ export function OAuthPage() {
   }
   if (!signedIn) {
     const keep = () => {
-      try {
-        window.sessionStorage.setItem(PENDING, `/oauth/authorize${window.location.search}`);
-      } catch {
-        // Without storage they open the link again once signed in.
-      }
+      keepPendingLink(`/oauth/authorize${window.location.search}`);
       void navigate({ to: '/sign-in' });
     };
     return (

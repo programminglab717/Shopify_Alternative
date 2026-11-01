@@ -9,7 +9,8 @@ import { LocalStorage } from '@hatti/storage';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { NestLogger } from '../logging.js';
-import { ApiModule, type ApiModuleOptions } from './api.module.js';
+import { ApiModule, cliLoginsOf, type ApiModuleOptions } from './api.module.js';
+import { receiveCliLogins } from './cli-login.js';
 import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { keepRawBodies, readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
@@ -126,9 +127,12 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveThemeImages(fastify, options.database, fileImages);
   // What failed in the admin's browser, logged for the error tracker (ADR-745).
   receiveAdminErrors(fastify, options.logger, options.identity.rateLimiter ?? null);
+  // A terminal's `hatti login`, begun and fetched here, approved in the admin (ADR-990).
+  const cliLogins = options.cliLogins ?? cliLoginsOf(options);
+  receiveCliLogins(fastify, cliLogins, options.identity.rateLimiter ?? null);
 
   const app = await NestFactory.create<NestFastifyApplication>(
-    ApiModule.forRoot(hearingEmailEvents(options)),
+    ApiModule.forRoot(hearingEmailEvents({ ...options, cliLogins })),
     adapter,
     {
       logger: new NestLogger(options.logger),
