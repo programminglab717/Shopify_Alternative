@@ -73,8 +73,8 @@ hatti theme dev  --theme thm_… --dir my-theme   # push each file as it is save
 hatti theme check --theme thm_…                 # its pages read for accessibility problems
 ```
 
-The theme shoppers see is changed only with `--allow-live`. The token is read from the
-environment and never written to disk.
+The theme shoppers see is changed only with `--allow-live`. `hatti login` (below) keeps a token
+for its owner alone; `HATTI_ACCESS_TOKEN`, where set, is used instead, as in CI.
 
 `hatti theme check` (ADR-968) reads the theme's home page, catalogue, first product, cart and
 search through its preview, in English and in Urdu, with [axe](https://github.com/dequelabs/axe-core),
@@ -127,6 +127,52 @@ it runs on one of the shop's own orders instead, made into the input checkout wo
 (ADR-950): its lines, subtotal, city and province, every way to pay checkout may offer, and the
 function's settings in the shop; `--save` keeps that input to edit and run again. No name, number
 or street of the customer's is in it.
+
+## AI agents and the command line
+
+`hatti` lets an AI agent on your own computer, such as Claude Code, work in your shop
+([ADR-990](../architecture/13-decision-log.md#adr-990--an-ai-agent-works-in-a-shop-through-hatti-a-login-the-shop-approves-in-the-admin-any-query-as-json-the-schema-searched-and-an-mcp-server-that-reads-unless-allowed-more)). Sign the terminal in once:
+
+```sh
+hatti login                 # read-only unless you choose otherwise in the admin
+```
+
+It shows a code and opens the admin's **Sign in a terminal** page. Signed in as the shop's owner
+or a manager, check the page shows the same code, choose the shop and whether the terminal only
+reads or changes things too, and let it in. It becomes an app on **Settings › Apps**, named for
+your computer; remove it there, or with `hatti logout`. Never approve a code someone sent you.
+
+Then, answered in JSON for an agent or a script to read:
+
+```sh
+hatti whoami                                    # the shop, and what the login may do
+hatti orders list --query "stage:needs_confirmation" --first 10
+hatti orders get '#1001'
+hatti products list --query "tag:eid"
+hatti schema --search "confirmation queue"      # find what to ask
+hatti schema --type Order                       # one type, whole
+hatti api '{ shop { name } }'
+hatti api --file report.graphql --var first=50
+echo 'mutation { … }' | hatti api -            # a change, where the login may make one
+hatti api --read-only --file q.graphql          # refuses a mutation
+```
+
+`--shop <handle>` uses another shop's login of those you signed in to.
+
+### As an MCP server
+
+`hatti mcp` serves the [Model Context Protocol](https://modelcontextprotocol.io) on standard input
+and output. In Claude Code:
+
+```sh
+claude mcp add hatti -- npx @hatti/cli mcp      # reads only
+claude mcp add hatti -- npx @hatti/cli mcp --allow-mutations
+```
+
+Its tools are `hatti_shop`, `hatti_schema` and `hatti_query`, which refuses a mutation; with
+`--allow-mutations`, `hatti_mutate` too, marked as changing the shop so that the agent asks you
+first. Whatever the agent is told, it can do no more than its login's scopes, and every change is
+on the shop's activity log under the terminal's app.
 
 ## Shoppers' accounts on the Storefront API
 

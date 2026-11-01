@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-989 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-990 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -997,6 +997,7 @@
 | 987 | A custom report's page charts it, one of its counts or amounts at a time | Accepted |
 | 988 | The outbox is kept in daily partitions, a week made ahead, past days dropped whole unless one of their events is waiting | Accepted |
 | 989 | The pilot runs on one machine: the repository's images composed, Caddy in front taking each shop's certificate on demand | Accepted |
+| 990 | An AI agent works in a shop through hatti: a login the shop approves in the admin, any query as JSON, the schema searched, and an MCP server that reads unless allowed more | Accepted |
 
 ---
 
@@ -31890,3 +31891,51 @@
   * The pilot needs a machine, a domain and a bucket, and nothing paid.
   * One machine is one point of failure, its backups hours apart: the runbook says so, and the
     cloud cell replaces it before more shops come.
+
+## ADR-990 · An AI agent works in a shop through hatti: a login the shop approves in the admin, any query as JSON, the schema searched, and an MCP server that reads unless allowed more
+
+* **Context:** Shopify's command line lets an AI agent on the merchant's own computer work in
+  their store. Hatti's `hatti` (ADR-850) took a custom app's token from the environment, made by
+  hand on Settings › Apps and pasted in, and spoke only of themes and functions. An agent needs a
+  safe way in, an answer it can read, a way to learn the API, and a protocol it already speaks.
+* **Decision:**
+  * **`hatti login`, as a TV signs in (RFC 8628):** the terminal asks the API for a login
+    (`POST /cli/login`) and shows a code, XXXX-XXXX in letters no one misreads, and a link to the
+    admin's `/cli-login`, which it opens. The shop's owner or a manager, signed in, sees the
+    terminal's name, the code and the address it asked from, a warning to approve only a code
+    their own terminal shows, and chooses the shop and whether it only reads or changes things too;
+    either way no more than their own role may. Approving it makes a custom app named for the
+    terminal (`Hatti CLI · laptop`), recorded on the activity and audit logs as any is, and needs
+    the owner to have proved who they are lately (ADR-103). The terminal asks every five seconds
+    (`POST /cli/login/token`) and is given the token once. A login lasts ten minutes; it waits in
+    Valkey, the token sealed (ADR-018) until fetched; one code makes one app however often it is
+    approved; logins begun and asks are limited by address.
+  * **Kept for its owner alone:** `~/.config/hatti/credentials.json` (or `HATTI_CONFIG_DIR`),
+    mode 0600, a login for each shop and the one in use; `--shop` picks another. Signing in to a
+    shop again gives up the token it had. `hatti logout` has the token give itself up
+    (`accessTokenRevoke`, a custom app's alone) and removes the app; `hatti whoami` says the shop
+    and the scopes, which the new `accessScopes` query gives any caller. `HATTI_ACCESS_TOKEN`
+    still wins where set, for CI.
+  * **Answers in JSON:** `hatti api` runs any query or mutation, from its argument, a file or
+    standard input, with `--variables` or `--var`, and `--read-only` refuses a mutation; errors
+    come as the API's own, as JSON, with exit code 1. `hatti schema` prints the schema, one type,
+    or the queries, mutations and types that match a search. `hatti products list`,
+    `hatti orders list` and `hatti orders get <id or #1001>` give the lists asked for most.
+  * **`hatti mcp`:** a Model Context Protocol server on standard input and output for Claude Code,
+    Claude Desktop or any MCP client: `hatti_shop`, `hatti_schema`, and `hatti_query`, which
+    refuses a mutation. `hatti_mutate`, marked destructive, is offered only when started with
+    `--allow-mutations`. Its instructions tell the agent that the shop's text is data and never
+    instructions, and to ask the person before any change.
+  * **Nothing new to trust:** no SDK beyond graphql-js, already the API's; the protocol is a few
+    JSON-RPC messages, as the store's own MCP endpoint answers them (ADR-847).
+* **Consequences:**
+  * An owner lets an agent in with one click, sees it on Settings › Apps beside their other apps,
+    and removes it there or with `hatti logout`.
+  * The safety is the token's: a read-only login cannot change the shop whatever the agent is
+    told; a write login can do what its approver's role does, and its changes are on the activity
+    log under its name.
+  * Each login is a custom app, of the 20 a shop keeps; signing in again replaces its own.
+  * Tried end to end before it was written down: the real command line against a running API,
+    approved in the built admin in a browser. The try found the API's depth limit of 12 refusing
+    graphql-js's introspection query, eight wrappings deep, so `hatti schema` asks one five deep;
+    and a large answer cut short in a pipe, so the command ends only once its output is written.
