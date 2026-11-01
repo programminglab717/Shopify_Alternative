@@ -16,6 +16,9 @@ import {
 } from './function.js';
 import { run } from './main.js';
 
+/** No token in the environment, and no login kept: not the machine's own. */
+const NO_LOGIN = { HATTI_CONFIG_DIR: '/nonexistent/hatti-test' };
+
 type Asked = { query: string; variables: Record<string, unknown> };
 
 /** Whether this machine builds Rust for WASI, as a Rust starter needs (ADR-942). */
@@ -141,13 +144,15 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
 
   it('runs as `hatti function …`: built without a token, deployed and listed with one', async () => {
     await configure({ ...CONFIG, build: builds(wasm()) });
-    expect(await run(['function', 'build', '--dir', dir], {}, out)).toBe(0);
+    expect(await run(['function', 'build', '--dir', dir], NO_LOGIN, out)).toBe(0);
     expect(lines.at(-1)).toBe(`Built cod-above-limit: dist/function.wasm, ${wasm().length} bytes`);
-    expect(await run(['function', 'deploy', '--dir', dir], {}, out)).toBe(1);
-    expect(lines.at(-1)).toMatch(/^! Set HATTI_ACCESS_TOKEN .* with write_settings\.$/);
+    expect(await run(['function', 'deploy', '--dir', dir], NO_LOGIN, out)).toBe(1);
+    expect(lines.at(-1)).toMatch(
+      /^! Run hatti login, or set HATTI_ACCESS_TOKEN .* with write_settings\.$/,
+    );
 
     const { client, asked } = api();
-    expect(await run(['function', 'deploy', '--dir', dir], {}, out, client)).toBe(0);
+    expect(await run(['function', 'deploy', '--dir', dir], NO_LOGIN, out, client)).toBe(0);
     expect(asked.at(-1)!.variables).toEqual({
       input: {
         handle: 'cod-above-limit',
@@ -162,17 +167,19 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
     ]);
     // Without its build, the module as it is.
     lines.length = 0;
-    expect(await run(['function', 'deploy', '--no-build', '--dir', dir], {}, out, client)).toBe(0);
+    expect(
+      await run(['function', 'deploy', '--no-build', '--dir', dir], NO_LOGIN, out, client),
+    ).toBe(0);
     expect(lines.some((line) => line.startsWith('Building'))).toBe(false);
 
-    expect(await run(['function', 'list'], {}, out, client)).toBe(0);
+    expect(await run(['function', 'list'], NO_LOGIN, out, client)).toBe(0);
     expect(lines.slice(-2)).toEqual([
       `cod-above-limit  [on]  ${CONFIG.title} (payment_customization)`,
       '  last failed: past its time',
     ]);
     // What the API refuses, it says.
     const refusing = api([{ field: ['input', 'wasm'], message: 'Its module imports env.fetch' }]);
-    expect(await run(['function', 'deploy', '--dir', dir], {}, out, refusing.client)).toBe(1);
+    expect(await run(['function', 'deploy', '--dir', dir], NO_LOGIN, out, refusing.client)).toBe(1);
     expect(lines.at(-1)).toBe('! Its module imports env.fetch');
   });
 
@@ -182,7 +189,11 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
     const runs = async (module: Uint8Array) => {
       await configure({ ...CONFIG, build: builds(Buffer.from(module)) });
       lines.length = 0;
-      return run(['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')], {}, out);
+      return run(
+        ['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')],
+        NO_LOGIN,
+        out,
+      );
     };
     // Its answer, without a token: it runs on this machine alone.
     expect(await runs(echoing())).toBe(0);
@@ -195,11 +206,15 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
     expect(await runs(spinning())).toBe(1);
     expect(lines.at(-2)).toBe('! It gave no answer (timeout): It ran past 50 ms');
     // It needs an input, of JSON.
-    expect(await run(['function', 'run', '--dir', dir], {}, out)).toBe(1);
+    expect(await run(['function', 'run', '--dir', dir], NO_LOGIN, out)).toBe(1);
     expect(lines.at(-1)).toBe('! Say what it runs on: --input <file.json>');
     await writeFile(join(dir, 'input.json'), '{');
     expect(
-      await run(['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')], {}, out),
+      await run(
+        ['function', 'run', '--dir', dir, '--input', join(dir, 'input.json')],
+        NO_LOGIN,
+        out,
+      ),
     ).toBe(1);
     expect(lines.at(-1)).toBe(`! ${join(dir, 'input.json')} is not JSON`);
   });
@@ -241,12 +256,14 @@ describe('Functions from the command line (DEV-07, ADR-922)', () => {
     expect(JSON.parse(await readFile(saved, 'utf8'))).toEqual(input);
     expect(JSON.parse(lines.at(-2)!)).toEqual(input);
     // No such order, or no token to ask with, it says.
-    expect(await run(['function', 'run', '--dir', dir, '--order', 'ord_9'], {}, out, client)).toBe(
-      1,
-    );
+    expect(
+      await run(['function', 'run', '--dir', dir, '--order', 'ord_9'], NO_LOGIN, out, client),
+    ).toBe(1);
     expect(lines.at(-1)).toBe('! The shop has no order ord_9');
-    expect(await run(['function', 'run', '--dir', dir, '--order', 'ord_1'], {}, out)).toBe(1);
-    expect(lines.at(-1)).toBe('! Set HATTI_ACCESS_TOKEN to read the order: read_orders');
+    expect(await run(['function', 'run', '--dir', dir, '--order', 'ord_1'], NO_LOGIN, out)).toBe(1);
+    expect(lines.at(-1)).toBe(
+      '! Run hatti login, or set HATTI_ACCESS_TOKEN, to read the order: read_orders',
+    );
   });
 
   it('begins a function of each target from its starter, which answers its sample cart (ADR-935)', async () => {

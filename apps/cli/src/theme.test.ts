@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { USAGE, run } from './main.js';
 import { listThemes, pullTheme, pushTheme, themeFilesIn, themePathOf } from './theme.js';
 
+/** No token in the environment, and no login kept: not the machine's own. */
+const NO_LOGIN = { HATTI_CONFIG_DIR: '/nonexistent/hatti-test' };
+
 type Asked = { query: string; variables: Record<string, unknown> };
 
 const MAIN = {
@@ -119,16 +122,20 @@ describe('Themes from the command line (DEV-08, ADR-850)', () => {
       log: (line: string) => lines.push(line),
       error: (line: string) => lines.push(`! ${line}`),
     };
-    expect(await run([], {}, out)).toBe(1);
+    expect(await run([], NO_LOGIN, out)).toBe(1);
     expect(lines.at(-1)).toBe(USAGE);
-    expect(await run(['theme', 'list'], {}, out)).toBe(1);
-    expect(lines.at(-1)).toMatch(/^! Set HATTI_ACCESS_TOKEN/);
+    expect(await run(['theme', 'list'], NO_LOGIN, out)).toBe(1);
+    expect(lines.at(-1)).toMatch(/^! Run hatti login, or set HATTI_ACCESS_TOKEN/);
     const { client } = api();
-    expect(await run(['theme', 'list'], {}, out, client)).toBe(0);
+    expect(await run(['theme', 'list'], NO_LOGIN, out, client)).toBe(0);
     expect(lines.slice(-2)).toEqual(['thm_1  [live] Hatti Base', 'thm_2  Eid edit']);
-    expect(await run(['theme', 'push', '--theme', 'thm_1', '--dir', dir], {}, out, client)).toBe(1);
+    expect(
+      await run(['theme', 'push', '--theme', 'thm_1', '--dir', dir], NO_LOGIN, out, client),
+    ).toBe(1);
     expect(lines.at(-1)).toMatch(/^! Hatti Base is the theme shoppers see/);
-    expect(await run(['theme', 'pull', '--theme', 'thm_2', '--dir', dir], {}, out, client)).toBe(0);
+    expect(
+      await run(['theme', 'pull', '--theme', 'thm_2', '--dir', dir], NO_LOGIN, out, client),
+    ).toBe(0);
     expect(lines.at(-1)).toBe(`Pulled 2 files into ${dir}`);
   });
 });
